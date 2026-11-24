@@ -656,7 +656,7 @@ function renderPlaylistHeader(){
 }
 function renderPlaylistCards(){
   el.grid.innerHTML = ''; el.more.style.display='none';
-  if (!pls.length){ showStatus('재생목록이 없어요'); return; }
+  if (!pls.length){ showStatus('아직 재생목록이 없어요<br><small>어른이 🔒를 3초 눌러 부모 메뉴 → "📂 재생목록"에 유튜브 재생목록 링크를 넣어 주세요</small>'); return; }
   hideStatus();
   pls.forEach(pl => {
     const list = plVideosOf(pl.id);
@@ -732,8 +732,8 @@ function renderTabs(){
   };
   mk('rec', '⭐ 추천');
   mk('chs', '📺 채널');
-  if (pls.length) mk('pls', '📂 재생목록');
-  if (pins.length) mk('pin', '📌 지정 영상');
+  mk('pls', '📂 재생목록');     // 비어 있어도 항상 보이게 (어디서 넣는지 안내)
+  mk('pin', '📌 지정 영상');
   mk('fav', `❤️ 즐겨찾기${favs.length ? ' ' + favs.filter(f=>allowed.has(f.id)).length : ''}`);
 }
 function showView(){
@@ -770,7 +770,8 @@ function showView(){
     view = recFeed;
   }
   el.grid.innerHTML = ''; shown = 0;
-  if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : currentTab === 'fav' && !chPage ? '아직 없어요!<br><small>다시 보고 싶은 영상의 🤍 를 누르면 여기 모여요</small>' : '영상이 없어요'); else hideStatus();
+  if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : currentTab === 'fav' && !chPage ? '아직 없어요!<br><small>다시 보고 싶은 영상의 🤍 를 누르면 여기 모여요</small>'
+      : currentTab === 'pin' && !chPage ? '아직 지정 영상이 없어요<br><small>어른이 🔒를 3초 눌러 부모 메뉴 → "📌 지정 영상"에 유튜브 영상 링크를 넣어 주세요</small>' : '영상이 없어요'); else hideStatus();
   renderMore();
 }
 function cardEl(v, onClick, opts){
