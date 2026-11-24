@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>은준이 영상관</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FFF8EC">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fff8ec; --ink:#2b2b3a; --card:#ffffff; --line:#eadfcb;
+    --c1:#e63946; --c2:#f4a261; --c3:#e9c46a; --c4:#2a9d8f; --c5:#457b9d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:'Jua','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  button{font-family:inherit;cursor:pointer}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:3px solid var(--line)}
+  .bar{display:flex;align-items:center;gap:14px;padding:12px 20px 8px}
+  .blocks{display:flex;gap:4px}
+  .blocks i{width:22px;height:22px;border-radius:5px;display:block}
+  h1{font-size:28px;margin:0;font-weight:400;flex:1}
+  #search{font-family:inherit;font-size:18px;padding:8px 14px;border-radius:20px;border:2px solid var(--line);
+    width:220px;max-width:30vw;background:#fff}
+  #lockBtn{width:48px;height:48px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:22px;
+    position:relative;overflow:hidden;touch-action:none;flex:none}
+  #lockBtn .fill{position:absolute;left:0;bottom:0;width:100%;height:0;background:#ffd16688}
+  #lockBtn span{position:relative}
+  #tabs{display:flex;gap:10px;padding:4px 20px 12px;overflow-x:auto;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none;font-size:19px;padding:8px 18px;border-radius:22px;border:2px solid var(--line);background:#fff;color:var(--ink)}
+  .tab.on{background:var(--c4);border-color:var(--c4);color:#fff}
+  #refreshRec{flex:none;font-size:19px;padding:8px 16px;border-radius:22px;border:none;background:var(--c3)}
+  #status{padding:30px 20px;text-align:center;font-size:24px}
+  #status .spin{display:inline-block;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;padding:20px}
+  .card{background:var(--card);border:none;border-radius:20px;padding:0;overflow:hidden;text-align:left;
+    box-shadow:0 5px 0 var(--line);transition:transform .1s;position:relative;color:var(--ink)}
+  .card:active{transform:translateY(4px);box-shadow:0 1px 0 var(--line)}
+  .card .th{aspect-ratio:16/9;width:100%;display:block;background:#ddd;object-fit:cover}
+  .card .tt{padding:10px 14px 4px;font-size:19px;line-height:1.3;min-height:2.9em;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .tt.wait{color:#aaa}
+  .card .cn{padding:0 14px 12px;font-size:14px;color:#8a7f6c}
+  .card .seen{position:absolute;top:8px;right:8px;background:#000a;color:#fff;font-size:14px;padding:3px 9px;border-radius:12px}
+  #more{display:block;margin:0 auto 40px;font-size:22px;padding:12px 30px;border-radius:30px;border:none;
+    background:var(--c4);color:#fff;box-shadow:0 4px 0 #1d6f65}
+
+  /* 플레이어 화면 */
+  #playerView{position:fixed;inset:0;background:#111;z-index:20;display:none;flex-direction:column}
+  #playerView.on{display:flex}
+  #stage{position:relative;flex:1;overflow:hidden}
+  #playerBox{position:absolute;inset:0}
+  #playerBox iframe{width:100%;height:100%;border:0}
+  /* 투명 덮개: 유튜브 화면 안의 링크·추천영상·로고를 누를 수 없게 막음 */
+  #shield{position:absolute;inset:0;z-index:2;background:transparent}
+  #pausedMark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;font-size:110px;color:#fff;
+    opacity:0;pointer-events:none;text-shadow:0 4px 20px #000;transition:opacity .2s}
+  #endScreen{position:absolute;inset:0;z-index:4;background:#111;color:#fff;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:20px}
+  #endScreen.on{display:flex}
+  #endScreen .msg{font-size:34px}
+  #endCards{display:grid;grid-template-columns:repeat(3,minmax(0,280px));gap:18px}
+  #endCards .card .tt{font-size:17px}
+  #endList{font-size:24px;padding:12px 28px;border:none;border-radius:40px;background:var(--c5);color:#fff}
+  #controls{display:flex;gap:16px;justify-content:center;align-items:center;padding:12px;background:#1b1b24}
+  #controls button{font-size:26px;border:none;border-radius:40px;padding:14px 28px;color:#fff;min-width:120px}
+  #btnBack{background:var(--c5)} #btnPlay{background:var(--c4)} #btnNext{background:var(--c2)}
+  #nowTitle{color:#ddd;font-size:18px;text-align:center;padding:6px 10px 0;background:#1b1b24;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #prog{height:8px;background:#333}
+  #prog i{display:block;height:100%;width:0;background:var(--c3)}
+
+  /* 부모 메뉴 */
+  #parent{position:fixed;inset:0;background:#0007;z-index:40;display:none;align-items:center;justify-content:center}
+  #parent.on{display:flex}
+  #parent .box{background:#fff;border-radius:18px;width:min(820px,95vw);max-height:92vh;overflow:auto;padding:22px;
+    font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;-webkit-user-select:text;user-select:text}
+  #parent h2{margin:0 0 12px;font-family:'Jua',sans-serif;font-weight:400}
+  #parent h3{margin:20px 0 8px;font-size:16px}
+  #parent .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  #parent .pbtn{font-size:14px;padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#f6f6f6}
+  #parent .pbtn.main{background:var(--c4);color:#fff;border-color:var(--c4)}
+  #parent .pbtn.warn{color:#c0392b}
+  #parent input,#parent select{font-size:14px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fff}
+  #parent .ch{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 10px;
+    border:1px solid #eee;border-radius:8px;margin-bottom:6px;font-size:14px}
+  #parent .ch.off{opacity:.5}
+  #parent .ch .meta{font-size:12px;color:#888}
+  #logBox{width:100%;height:220px;font:12px/1.4 Consolas,monospace;white-space:pre;border:1px solid #ddd;border-radius:8px;padding:8px}
+  #parent .note{font-size:13px;color:#666}
+  #parent .stat{font-size:15px;background:#f7f4ee;border-radius:8px;padding:10px 12px}
+  #toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;
+    border-radius:20px;font-size:15px;z-index:60;opacity:0;transition:opacity .3s;pointer-events:none}
+  #ytLoader{position:fixed;left:-9999px;top:0;width:200px;height:120px;overflow:hidden}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="blocks"><i style="background:var(--c1)"></i><i style="background:var(--c2)"></i><i style="background:var(--c3)"></i><i style="background:var(--c4)"></i><i style="background:var(--c5)"></i></div>
+    <h1>은준이 영상관</h1>
+    <input id="search" type="search" placeholder="🔍 찾기">
+    <button id="lockBtn" title="부모 메뉴 (3초 누르기)"><div class="fill"></div><span>🔒</span></button>
+  </div>
+  <div id="tabs"></div>
+</header>
+
+<div id="status"><span class="spin">⏳</span> 영상을 불러오는 중…</div>
+<div id="grid"></div>
+<button id="more" style="display:none">더 보기 ⬇</button>
+
+<div id="playerView">
+  <div id="stage">
+    <div id="playerBox"><div id="ytPlayer"></div></div>
+    <div id="shield"></div>
+    <div id="pausedMark">⏸</div>
+    <div id="endScreen">
+      <div class="msg">🎉 끝! 다음엔 뭐 볼까?</div>
+      <div id="endCards"></div>
+      <button id="endList">📺 목록으로</button>
+    </div>
+  </div>
+  <div id="nowTitle"></div>
+  <div id="prog"><i></i></div>
+  <div id="controls">
+    <button id="btnBack">◀ 목록</button>
+    <button id="btnPlay">⏸ 멈춤</button>
+    <button id="btnNext">다음 ▶</button>
+  </div>
+</div>
+
+<div id="parent">
+  <div class="box">
+    <h2>👨 부모 메뉴</h2>
+    <div class="row">
+      <button class="pbtn main" id="pRefresh">영상 목록 새로 불러오기</button>
+      <button class="pbtn" id="pClose">닫기</button>
+      <button class="pbtn" id="pExit" style="display:none;margin-left:auto">앱 종료</button>
+    </div>
+
+    <h3>📊 시청 요약</h3>
+    <div class="stat" id="statBox"></div>
+
+    <h3>📺 허용 채널 목록</h3>
+    <div id="chList"></div>
+    <div class="row">
+      <input id="chId" placeholder="채널 ID(UC…) 또는 채널 주소" style="flex:1;min-width:240px">
+      <input id="chName" placeholder="표시 이름 (비우면 자동)" style="width:180px">
+      <button class="pbtn main" id="chAdd">채널 추가</button>
+    </div>
+    <p class="note">
+      · 여기 있는 채널의 영상만 목록·추천·다음 영상에 나오고, 그 외 영상은 재생되지 않아요.<br>
+      · <b>채널 ID 얻는 법</b>: 유튜브 앱에서 채널 열기 → 채널 이름 아래 설명(＞) 누르기 → 맨 아래 <b>채널 공유 → 채널 ID 복사</b>.
+        주소가 <code>youtube.com/channel/UC…</code> 형태면 주소를 그대로 붙여 넣어도 돼요. (<code>@이름</code> 주소는 인식 못 해요)<br>
+      · <b>추천 비중</b>: "많이"로 두면 그 채널 영상이 추천에 더 자주 나와요. "끔"은 잠시 숨기기(삭제 아님).
+    </p>
+
+    <h3>🧠 추천 방식</h3>
+    <p class="note">추천 = 허용 채널 영상만 섞어서 → 최신 영상 우선 + 은준이가 끝까지 잘 본 채널 우선 + 오늘 본 영상은 뒤로, 금방 꺼버린 영상은 덜 나오게 + 같은 채널이 3개 이상 연달아 나오지 않게.</p>
+    <div class="row"><button class="pbtn warn" id="histClear">시청 기록 지우기 (추천 초기화)</button></div>
+
+    <h3>📝 로그 <span class="note" id="logCount"></span></h3>
+    <textarea id="logBox" readonly></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="pbtn" id="logCopy">로그 복사</button>
+      <button class="pbtn" id="logSave">로그 파일로 저장</button>
+      <button class="pbtn" id="logClear">로그 지우기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="ytLoader"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   설정 — 기본 허용 채널 (부모 메뉴에서 추가/끄기/삭제)
+   weight: 1=조금, 2=보통, 3=많이 / on: 켜짐 여부
+   ========================================================= */
+const DEFAULT_CHANNELS = [
+  { id: 'UCPlwvN0w4qFSP1FllALB92w', name: 'Numberblocks', on: true, weight: 2 },   // 넘버블럭스 영어 공식
+  { id: 'UC_qs3c0ehDvZkbiEbOj6Drg', name: 'Alphablocks',  on: true, weight: 2 },   // 알파블럭스 공식
+  { id: 'UCQkuKPaVlYK7QCIVTb0lV2Q', name: 'Colourblocks', on: true, weight: 2 }    // 컬러블럭스 공식
+];
+const PAGE_SIZE = 40;
+const LOAD_TIMEOUT_MS = 25000;
+const LIST_CACHE_HOURS = 12;
+const TITLE_CONCURRENCY = 4;
+const CHANNEL_CONCURRENCY = 2;
+const LS = { channels:'kt_channels_v2', list:'kt_list_v2', titles:'kt_titles', bad:'kt_bad', log:'kt_log', hist:'kt_hist', tab:'kt_tab' };
+
+/* ---------- 저장소 (막혀 있어도 동작) ---------- */
+function storeFactory(){
+  const mem = {};
+  return {
+    get(k, def){ try{ const v = localStorage.getItem(k); return v==null?def:JSON.parse(v); }catch(e){ return k in mem?mem[k]:def; } },
+    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ mem[k]=v; } }
+  };
+}
+const store = storeFactory();
+
+/* ---------- 로그 ---------- */
+const LOG_MAX = 3000;
+let logs = store.get(LS.log, []); if (!Array.isArray(logs)) logs = [];
+let logSaveTimer = null;
+function ts(d){ d=d||new Date(); const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,'0')}`; }
+function log(level, msg, data){
+  let extra = '';
+  if (data !== undefined){ try{ extra = ' ' + (typeof data==='string'?data:JSON.stringify(data)); }catch(e){ extra=' [data]'; } }
+  const line = `[${ts()}] [${level}] ${msg}${extra}`;
+  logs.push(line);
+  try{ if (window.AndroidBridge) window.AndroidBridge.log(line); }catch(e){}
+  if (logs.length > LOG_MAX) logs.splice(0, logs.length - LOG_MAX);
+  (level==='ERROR'?console.error:level==='WARN'?console.warn:console.log)(line);
+  clearTimeout(logSaveTimer); logSaveTimer = setTimeout(()=>store.set(LS.log, logs), 800);
+  try{ if (el.parent.classList.contains('on')) renderLog(); }catch(e){}
+}
+window.addEventListener('error', e => log('ERROR', '스크립트 오류', `${e.message} @${e.filename}:${e.lineno}`));
+window.addEventListener('unhandledrejection', e => log('ERROR', '처리 안 된 Promise 오류', String(e.reason && (e.reason.stack||e.reason))));
+
+const $ = id => document.getElementById(id);
+const el = {
+  grid:$('grid'), status:$('status'), more:$('more'), search:$('search'), tabs:$('tabs'),
+  playerView:$('playerView'), shield:$('shield'), pausedMark:$('pausedMark'), endScreen:$('endScreen'), endCards:$('endCards'),
+  btnBack:$('btnBack'), btnPlay:$('btnPlay'), btnNext:$('btnNext'), endList:$('endList'),
+  nowTitle:$('nowTitle'), prog:document.querySelector('#prog i'),
+  lockBtn:$('lockBtn'), parent:$('parent'), logBox:$('logBox'), logCount:$('logCount'), statBox:$('statBox'),
+  chList:$('chList'), chId:$('chId'), chName:$('chName'), toast:$('toast'), loader:$('ytLoader')
+};
+
+log('INFO', '앱 시작 v2', { url: location.href, ua: navigator.userAgent });
+if (window.AndroidBridge) log('INFO','안드로이드 앱 안에서 실행 중');
+if (location.protocol === 'file:') log('ERROR', 'file:// 로 열림 — 유튜브가 재생을 막습니다(오류 153).');
+
+/* ---------- 상태 ---------- */
+function loadChannels(){
+  let c = store.get(LS.channels, null);
+  if (!Array.isArray(c) || !c.length){
+    // v1에서 쓰던 채널 목록이 있으면 옮겨옴
+    const old = store.get('kt_channels', null);
+    c = (Array.isArray(old) && old.length) ? old : DEFAULT_CHANNELS.map(x=>({...x}));
+  }
+  return c.filter(x => x && /^UC[\w-]{22}$/.test(x.id)).map(x => ({ id:x.id, name:x.name||x.id, on: x.on!==false, weight: [1,2,3].includes(x.weight)?x.weight:2 }));
+}
+let channels = loadChannels();
+if (!channels.length) channels = DEFAULT_CHANNELS.map(x=>({...x}));
+// 새로 추가된 기본 채널은 한 번만 자동으로 넣어 줌 (부모가 삭제하면 다시 생기지 않음)
+(function addNewDefaults(){
+  const seen = new Set(store.get('kt_defaults_seen', []) || []);
+  if (!seen.size) channels.forEach(c => seen.add(c.id));
+  DEFAULT_CHANNELS.forEach(d => {
+    if (!seen.has(d.id)){
+      if (!channels.some(c=>c.id===d.id)){ channels.push({...d}); log('INFO','기본 채널 자동 추가', d); }
+      seen.add(d.id);
+    }
+  });
+  DEFAULT_CHANNELS.forEach(d => seen.add(d.id));
+  store.set('kt_defaults_seen', [...seen]);
+})();
+store.set(LS.channels, channels);
+
+let titles = store.get(LS.titles, {}) || {};
+let badIds = new Set(store.get(LS.bad, []) || []);
+let hist = store.get(LS.hist, {}) || {};   // { videoId: {n, last, sec, dur, done, skip} }
+let listCache = store.get(LS.list, {}) || {}; // { chId: {time, ids} }
+
+let videos = [];            // 켜진 채널의 영상 [{id, ch, rank, total}]
+let byId = new Map();
+let allowed = new Set();
+let view = [];              // 현재 화면 목록
+let shown = 0;
+let currentTab = store.get(LS.tab, 'rec') || 'rec';
+let recFeed = [];
+let ytReady = false, player = null, playerReady = false;
+let current = null, progTimer = null, lastTick = 0;
+
+function chOf(id){ return channels.find(c=>c.id===id); }
+function toast(msg){ el.toast.textContent = msg; el.toast.style.opacity = 1; clearTimeout(toast.t); toast.t=setTimeout(()=>el.toast.style.opacity=0, 2400); }
+function uploadsId(chId){ return 'UU' + chId.slice(2); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function saveHist(){ clearTimeout(saveHist.t); saveHist.t = setTimeout(()=>store.set(LS.hist, hist), 1000); }
+function showStatus(html, isErr){ el.status.style.display='block'; el.status.innerHTML = html; el.status.style.color = isErr?'#c0392b':''; }
+function hideStatus(){ el.status.style.display='none'; }
+
+/* ---------- 유튜브 IFrame API ---------- */
+window.onYouTubeIframeAPIReady = function(){ ytReady = true; log('INFO', 'YouTube IFrame API 준비됨'); loadAll(false); };
+(function loadYT(){
+  const s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  s.onerror = () => { log('ERROR', 'YouTube API 스크립트 로드 실패 (인터넷 확인)'); showStatus('⚠️ 인터넷 연결을 확인해 주세요.', true); };
+  document.head.appendChild(s);
+  setTimeout(()=>{ if(!ytReady){ log('ERROR','YouTube API 15초 내 응답 없음'); showStatus('⚠️ 유튜브에 연결하지 못했어요. 새로고침 해 주세요.', true); } }, 15000);
+})();
+
+/* ---------- 채널 영상 목록 (업로드 재생목록 → getPlaylist, API 키 불필요) ---------- */
+function fetchChannelIds(ch){
+  return new Promise((resolve, reject) => {
+    const holder = document.createElement('div');
+    const hid = 'ld_' + Math.random().toString(36).slice(2);
+    holder.id = hid; el.loader.appendChild(holder);
+    let done = false, tries = 0, p = null;
+    const finish = (err, ids) => {
+      if (done) return; done = true; clearTimeout(timer);
+      try{ p && p.destroy(); }catch(e){}
+      const n = document.getElementById(hid); n && n.remove();
+      err ? reject(err) : resolve(ids);
+    };
+    const timer = setTimeout(()=>finish(new Error('시간 초과')), LOAD_TIMEOUT_MS);
+    const poll = () => {
+      if (done) return;
+      let ids = null; try{ ids = p.getPlaylist(); }catch(e){}
+      if (ids && ids.length){ finish(null, ids.slice()); return; }
+      if (++tries > 50){ finish(new Error('재생목록이 비어 있음 (채널 ID 확인)')); return; }
+      setTimeout(poll, 400);
+    };
+    try{
+      p = new YT.Player(hid, {
+        width:200, height:120,
+        playerVars:{ listType:'playlist', list:uploadsId(ch.id), autoplay:0, mute:1, origin:location.origin },
+        events:{
+          onReady: () => poll(),
+          onError: e => { log('WARN', `[${ch.name}] 로더 오류 코드 ${e.data}`); poll(); }
+        }
+      });
+    }catch(e){ finish(e); }
+  });
+}
+
+async function loadAll(force){
+  if (!ytReady) return;
+  showStatus('<span class="spin">⏳</span> 영상을 불러오는 중…');
+  el.grid.innerHTML=''; el.more.style.display='none';
+  const need = channels.filter(c => c.on && (force || !listCache[c.id] || !listCache[c.id].ids || !listCache[c.id].ids.length
+                || Date.now() - listCache[c.id].time > LIST_CACHE_HOURS*3600e3));
+  log('INFO', '목록 불러오기', { 켜진채널: channels.filter(c=>c.on).length, 새로받기: need.length, force: !!force });
+  const failed = [];
+  let idx = 0;
+  async function worker(){
+    while (idx < need.length){
+      const ch = need[idx++];
+      try{
+        const ids = await fetchChannelIds(ch);
+        listCache[ch.id] = { time: Date.now(), ids };
+        log('INFO', `[${ch.name}] 영상 ${ids.length}개 받음`);
+        if (!ch.name || ch.name === ch.id) autoName(ch, ids[0]);
+      }catch(e){
+        failed.push(ch.name);
+        log('ERROR', `[${ch.name}] 목록 불러오기 실패`, String(e && e.message || e));
+      }
+    }
+  }
+  await Promise.all(Array.from({length: CHANNEL_CONCURRENCY}, worker));
+  store.set(LS.list, listCache);
+  if (failed.length) toast(`못 불러온 채널: ${failed.join(', ')} (이전 목록 사용)`);
+  buildVideos();
+}
+
+function buildVideos(){
+  videos = []; byId = new Map();
+  for (const ch of channels){
+    if (!ch.on) continue;
+    const c = listCache[ch.id]; if (!c || !c.ids) continue;
+    const total = c.ids.length;
+    c.ids.forEach((id, rank) => {
+      if (badIds.has(id) || byId.has(id)) return;
+      const v = { id, ch: ch.id, rank, total };
+      videos.push(v); byId.set(id, v);
+    });
+  }
+  allowed = new Set(videos.map(v=>v.id));
+  log('INFO', '사용할 영상 수', videos.length);
+  if (!videos.length){
+    showStatus('⚠️ 보여줄 영상이 없어요.<br><small>부모 메뉴(🔒 3초)에서 채널과 로그를 확인해 주세요.</small>', true);
+    renderTabs(); return;
+  }
+  recFeed = buildRecommendations();
+  renderTabs();
+  showView();
+  fetchTitles();
+}
+
+/* ---------- 추천 알고리즘 (허용 채널 안에서만) ---------- */
+function channelLove(){
+  // 채널별 '잘 본 정도' 0~1 : 끝까지 본 횟수·시청 시간 기반
+  const raw = {};
+  for (const [id, h] of Object.entries(hist)){
+    const v = byId.get(id); if (!v) continue;
+    raw[v.ch] = (raw[v.ch]||0) + (h.done||0)*2 + Math.min(h.sec||0, 1200)/300 - (h.skip||0)*0.5;
+  }
+  const max = Math.max(1, ...Object.values(raw).map(x=>Math.max(0,x)));
+  const out = {}; for (const k in raw) out[k] = Math.max(0, raw[k]) / max;
+  return out;
+}
+function scoreOf(v, love, opts){
+  opts = opts || {};
+  const ch = chOf(v.ch); if (!ch || !ch.on) return -1e9;
+  const now = Date.now();
+  const recency = 1 - v.rank / Math.max(1, v.total);          // 최신일수록 1
+  let s = recency * 1.2 + Math.random() * 1.3;                   // 기본: 최신 + 랜덤(매번 달라지게)
+  s += (ch.weight - 2) * 0.7;                                    // 부모가 정한 비중
+  s += (love[v.ch] || 0) * 0.6;                                  // 은준이가 잘 보는 채널
+  const h = hist[v.id];
+  if (h){
+    const days = (now - (h.last||0)) / 864e5;
+    if (days < 1) s -= 3; else if (days < 3) s -= 1.5; else if (days < 14) s -= 0.6;
+    s -= Math.min(h.skip||0, 3) * 0.7;                           // 금방 꺼버린 영상
+    if (h.done && days >= 14) s += 0.3;                          // 예전에 끝까지 본 영상은 다시 볼 만함
+  }
+  if (opts.sameCh && v.ch === opts.sameCh) s += 0.8;             // 끝난 뒤 추천: 같은 채널 조금 우선
+  if (opts.exclude && opts.exclude.has(v.id)) s = -1e9;
+  return s;
+}
+function diversify(sorted, maxRun){
+  // 같은 채널이 maxRun개 넘게 연달아 나오지 않도록 재배열
+  const out = [], pool = sorted.slice();
+  while (pool.length){
+    const k = out.length;
+    const runCh = k >= maxRun && out.slice(k-maxRun).every(v=>v.ch===out[k-1].ch) ? out[k-1].ch : null;
+    let i = runCh ? pool.findIndex(v=>v.ch!==runCh) : 0;
+    if (i < 0) i = 0;
+    out.push(pool.splice(i,1)[0]);
+  }
+  return out;
+}
+function buildRecommendations(opts){
+  const love = channelLove();
+  const scored = videos.map(v => ({ v, s: scoreOf(v, love, opts) })).filter(x => x.s > -1e8);
+  scored.sort((a,b) => b.s - a.s);
+  const feed = diversify(scored.map(x=>x.v), 2);
+  log('INFO', '추천 목록 생성', { 개수: feed.length, 채널선호: love, 앞5개: feed.slice(0,5).map(v=>v.id) });
+  return feed;
+}
+function suggestNext(cur, n){
+  const ex = new Set([cur && cur.id]);
+  return buildRecommendations({ sameCh: cur && cur.ch, exclude: ex }).slice(0, n);
+}
+
+/* ---------- 탭 · 목록 화면 ---------- */
+function renderTabs(){
+  el.tabs.innerHTML = '';
+  const onCh = channels.filter(c=>c.on && listCache[c.id]);
+  if (currentTab !== 'rec' && !onCh.some(c=>c.id===currentTab)) currentTab = 'rec';
+  const mk = (key, label) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (currentTab===key ? ' on' : ''); b.textContent = label;
+    b.addEventListener('click', () => { currentTab = key; store.set(LS.tab, key); log('INFO','탭 선택', label); renderTabs(); showView(); window.scrollTo(0,0); });
+    el.tabs.appendChild(b);
+  };
+  mk('rec', '⭐ 추천');
+  if (onCh.length > 1) onCh.forEach(c => mk(c.id, c.name));
+  else if (onCh.length === 1) mk(onCh[0].id, `🆕 ${onCh[0].name} 최신`);
+  const r = document.createElement('button'); r.id='refreshRec'; r.textContent='🔄 새 추천';
+  r.addEventListener('click', () => { recFeed = buildRecommendations(); currentTab='rec'; store.set(LS.tab,'rec'); renderTabs(); showView(); window.scrollTo(0,0); toast('새로운 추천이에요!'); });
+  el.tabs.appendChild(r);
+}
+function showView(){
+  const q = el.search.value.trim().toLowerCase();
+  let base = currentTab === 'rec' ? recFeed : videos.filter(v=>v.ch===currentTab).sort((a,b)=>a.rank-b.rank);
+  view = q ? videos.filter(v => (titles[v.id]||'').toLowerCase().includes(q)) : base;
+  el.grid.innerHTML = ''; shown = 0;
+  if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : '영상이 없어요'); else hideStatus();
+  renderMore();
+}
+function cardEl(v, onClick){
+  const b = document.createElement('button');
+  b.className = 'card'; b.dataset.id = v.id;
+  const t = titles[v.id], ch = chOf(v.ch), h = hist[v.id];
+  const seenToday = h && (Date.now() - h.last) < 864e5;
+  b.innerHTML = `<img class="th" loading="lazy" alt="" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg">
+     ${seenToday ? '<span class="seen">봤어요 ✓</span>' : ''}
+     <div class="tt ${t?'':'wait'}">${t?esc(t):'…'}</div>
+     <div class="cn">${esc(ch ? ch.name : '')}</div>`;
+  b.addEventListener('click', onClick || (() => play(v.id, '목록')));
+  return b;
+}
+function renderMore(){
+  const frag = document.createDocumentFragment();
+  const end = Math.min(shown + PAGE_SIZE, view.length);
+  for (let i=shown;i<end;i++) frag.appendChild(cardEl(view[i]));
+  el.grid.appendChild(frag);
+  shown = end;
+  el.more.style.display = shown < view.length ? 'block' : 'none';
+}
+el.more.addEventListener('click', renderMore);
+let searchT=null;
+el.search.addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTimeout(showView, 250); });
+
+/* ---------- 제목 (oEmbed → 대체 서버) ---------- */
+let titleQueue = [], titleRunning = 0, titleSaveT = null, titleFails = 0;
+function fetchTitles(){
+  const order = [...recFeed.slice(0, 80), ...videos];
+  const seen = new Set();
+  titleQueue = order.map(v=>v.id).filter(id => !titles[id] && !seen.has(id) && seen.add(id));
+  log('INFO', '제목 조회 대상', titleQueue.length);
+  for (let i=titleRunning;i<TITLE_CONCURRENCY;i++) titleWorker();
+}
+async function getOembed(id){
+  const watch = encodeURIComponent('https://www.youtube.com/watch?v=' + id);
+  for (const u of [`https://www.youtube.com/oembed?url=${watch}&format=json`, `https://noembed.com/embed?url=${watch}`]){
+    try{
+      const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), 8000);
+      const r = await fetch(u, { signal: ctrl.signal }); clearTimeout(t);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && j.title) return j;
+    }catch(e){}
+  }
+  return null;
+}
+async function titleWorker(){
+  titleRunning++;
+  while (titleQueue.length){
+    const id = titleQueue.shift();
+    const j = await getOembed(id);
+    if (j){
+      titles[id] = j.title;
+      document.querySelectorAll(`[data-id="${id}"] .tt`).forEach(n => { n.textContent = j.title; n.classList.remove('wait'); });
+    } else if (++titleFails <= 5) log('WARN', '제목 조회 실패', id);
+    clearTimeout(titleSaveT); titleSaveT = setTimeout(()=>store.set(LS.titles, titles), 1000);
+  }
+  titleRunning--;
+}
+async function autoName(ch, firstId){
+  if (!firstId) return;
+  const j = await getOembed(firstId);
+  if (j && j.author_name){
+    ch.name = j.author_name; store.set(LS.channels, channels);
+    log('INFO', '채널 이름 자동 설정', { id: ch.id, name: ch.name });
+    renderTabs(); renderChannels();
+  }
+}
+
+/* ---------- 플레이어 ---------- */
+function ensurePlayer(cb){
+  if (player && playerReady){ cb(); return; }
+  ensurePlayer.q.push(cb);
+  if (player) return;
+  player = new YT.Player('ytPlayer', {
+    width:'100%', height:'100%',
+    playerVars:{ rel:0, controls:0, disablekb:1, fs:0, iv_load_policy:3, modestbranding:1, playsinline:1, cc_load_policy:0, autoplay:1, origin:location.origin },
+    events:{
+      onReady: () => { playerReady = true; log('INFO','메인 플레이어 준비'); const q=ensurePlayer.q; ensurePlayer.q=[]; q.forEach(f=>f()); },
+      onStateChange: onState,
+      onError: onPlayerError
+    }
+  });
+}
+ensurePlayer.q = [];
+
+function play(id, from){
+  if (!allowed.has(id)){ log('WARN','허용 목록에 없는 영상 재생 시도 차단', id); return; }
+  finishWatch('다른 영상 선택');
+  current = { id, ch: byId.get(id).ch, start: Date.now(), sec: 0 };
+  el.playerView.classList.add('on');
+  el.endScreen.classList.remove('on');
+  el.nowTitle.textContent = titles[id] || '';
+  log('INFO', '재생 시작', { id, title: titles[id] || '', 경로: from || '' });
+  ensurePlayer(() => { try{ player.loadVideoById(id); }catch(e){ log('ERROR','loadVideoById 실패', String(e)); } });
+  startProgress();
+}
+
+/* 시청 기록: 본 시간·끝까지 봤는지·금방 껐는지 → 추천에 반영 */
+function finishWatch(reason, ended){
+  if (!current) return;
+  const h = hist[current.id] || { n:0, sec:0, done:0, skip:0 };
+  let dur = 0; try{ dur = player.getDuration() || 0; }catch(e){}
+  h.n++; h.last = Date.now(); h.sec = (h.sec||0) + Math.round(current.sec); if (dur) h.dur = Math.round(dur);
+  const ratio = dur ? current.sec / dur : 0;
+  if (ended || ratio >= 0.85) h.done = (h.done||0) + 1;
+  else if (current.sec < 30 && ratio < 0.2) h.skip = (h.skip||0) + 1;
+  hist[current.id] = h; saveHist();
+  log('INFO', '시청 기록', { id: current.id, 본초: Math.round(current.sec), 길이: Math.round(dur), 끝까지: !!(ended || ratio>=0.85), 이유: reason });
+  current = null;
+}
+
+function onState(e){
+  const S = YT.PlayerState;
+  const names = {'-1':'시작전','0':'끝','1':'재생','2':'일시정지','3':'버퍼링','5':'준비'};
+  log('DEBUG', '플레이어 상태', names[e.data] || e.data);
+  if (e.data === S.PLAYING){
+    el.btnPlay.textContent = '⏸ 멈춤'; el.pausedMark.style.opacity = 0;
+    let vid = null; try{ vid = player.getVideoData().video_id; }catch(err){}
+    if (vid && !allowed.has(vid)){
+      log('WARN', '허용되지 않은 영상 감지 → 중단', vid);
+      try{ player.stopVideo(); }catch(err){}
+      closePlayer(); return;
+    }
+    try{ const t = player.getVideoData().title; if (t){ el.nowTitle.textContent = t; if (vid && !titles[vid]){ titles[vid]=t; store.set(LS.titles,titles);} } }catch(err){}
+  } else if (e.data === S.PAUSED){
+    el.btnPlay.textContent = '▶ 보기'; el.pausedMark.style.opacity = .9;
+  } else if (e.data === S.ENDED){
+    const cur = current ? byId.get(current.id) : null;
+    finishWatch('끝까지 봄', true);
+    showEndScreen(cur);
+  }
+}
+function showEndScreen(cur){
+  // 유튜브 추천 화면 대신: 허용 채널 안에서 고른 다음 영상 3개
+  el.endCards.innerHTML = '';
+  const picks = suggestNext(cur, 3);
+  picks.forEach(v => el.endCards.appendChild(cardEl(v, () => play(v.id, '끝 화면 추천'))));
+  el.endScreen.classList.add('on');
+  log('INFO', '끝 화면 추천', picks.map(v=>v.id));
+}
+function onPlayerError(e){
+  let id = null; try{ id = player.getVideoData().video_id; }catch(err){}
+  id = id || (current && current.id);
+  const reasons = {2:'잘못된 ID',5:'HTML5 오류',100:'삭제/비공개 영상',101:'퍼가기 금지 영상',150:'퍼가기 금지 영상',153:'Referer 없음(file:// 실행)'};
+  log('ERROR', `재생 오류 ${e.data} (${reasons[e.data]||'알 수 없음'})`, id);
+  if ([100,101,150].includes(e.data) && id){
+    current = null;
+    badIds.add(id); store.set(LS.bad, [...badIds]);
+    allowed.delete(id); videos = videos.filter(v=>v.id!==id); recFeed = recFeed.filter(v=>v.id!==id);
+    document.querySelectorAll(`#grid [data-id="${id}"]`).forEach(n=>n.remove());
+    toast('이 영상은 여기서 볼 수 없어요. 다른 영상으로!');
+    setTimeout(next, 1200);
+  } else toast('재생에 문제가 생겼어요');
+}
+function togglePlay(){
+  if (!playerReady) return;
+  try{ player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(); }
+  catch(e){ log('ERROR','재생/멈춤 실패', String(e)); }
+}
+function next(){
+  const cur = current ? byId.get(current.id) : null;
+  const pick = suggestNext(cur, 1)[0];
+  if (!pick) return closePlayer();
+  play(pick.id, '다음 버튼');
+}
+function closePlayer(){
+  finishWatch('목록으로');
+  try{ player && playerReady && player.stopVideo(); }catch(e){}
+  el.playerView.classList.remove('on');
+  el.endScreen.classList.remove('on');
+  stopProgress();
+  // 방금 본 기록을 반영해 '봤어요' 표시 갱신 (추천 순서는 그대로 둬서 아이가 헷갈리지 않게)
+  showView();
+  log('INFO', '목록으로 돌아감');
+}
+function startProgress(){
+  stopProgress(); lastTick = Date.now();
+  progTimer = setInterval(()=>{
+    const now = Date.now(), dt = (now - lastTick)/1000; lastTick = now;
+    try{
+      if (current && player.getPlayerState() === YT.PlayerState.PLAYING) current.sec += Math.min(dt, 2);
+      const d = player.getDuration(), c = player.getCurrentTime();
+      if (d>0) el.prog.style.width = (c/d*100)+'%';
+    }catch(e){}
+  }, 500);
+}
+function stopProgress(){ clearInterval(progTimer); el.prog.style.width='0'; }
+
+el.shield.addEventListener('click', togglePlay);
+el.btnPlay.addEventListener('click', togglePlay);
+el.btnBack.addEventListener('click', closePlayer);
+el.btnNext.addEventListener('click', next);
+el.endList.addEventListener('click', closePlayer);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){
+    if (el.parent.classList.contains('on')) closeParent();
+    else if (el.playerView.classList.contains('on')) closePlayer();
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && current){ try{ player.pauseVideo(); }catch(e){} log('INFO','화면 숨김 → 일시정지'); }
+});
+
+/* ---------- 부모 메뉴 (자물쇠 3초) ---------- */
+let holdT = null, holdStart = 0, holdAnim = null;
+const fill = el.lockBtn.querySelector('.fill');
+function holdBegin(e){
+  e.preventDefault(); holdStart = Date.now();
+  holdAnim = setInterval(()=>{ fill.style.height = Math.min(100,(Date.now()-holdStart)/30)+'%'; }, 50);
+  holdT = setTimeout(()=>{ holdEnd(); openParent(); }, 3000);
+}
+function holdEnd(){ clearTimeout(holdT); clearInterval(holdAnim); fill.style.height='0'; }
+el.lockBtn.addEventListener('pointerdown', holdBegin);
+['pointerup','pointerleave','pointercancel'].forEach(ev => el.lockBtn.addEventListener(ev, holdEnd));
+el.lockBtn.addEventListener('click', ()=>toast('어른이 3초 꾹 눌러요 🔒'));
+
+function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderStats(); renderLog(); el.parent.classList.add('on'); }
+let channelsChanged = false;
+function closeParent(){
+  el.parent.classList.remove('on');
+  if (channelsChanged){ channelsChanged = false; loadAll(false); }
+}
+$('pClose').addEventListener('click', closeParent);
+$('pRefresh').addEventListener('click', ()=>{ channelsChanged = false; el.parent.classList.remove('on'); log('INFO','수동 새로고침'); loadAll(true); });
+
+function renderStats(){
+  const dayStart = new Date(); dayStart.setHours(0,0,0,0);
+  let n=0, sec=0; const perCh = {};
+  for (const [id,h] of Object.entries(hist)){
+    const v = byId.get(id);
+    if (v){ perCh[v.ch] = (perCh[v.ch]||0) + (h.done||0); }
+    if ((h.last||0) >= dayStart.getTime()){ n++; }
+  }
+  // 오늘 본 시간은 로그 대신 기록에서 대략 계산 (오늘 마지막으로 본 영상들의 누적 시간)
+  for (const h of Object.values(hist)) if ((h.last||0) >= dayStart.getTime()) sec += Math.min(h.sec||0, h.dur||h.sec||0);
+  const chTxt = channels.map(c => `${esc(c.name)} ${perCh[c.id]||0}편`).join(' · ');
+  el.statBox.innerHTML = `오늘 본 영상 <b>${n}편</b> · 약 <b>${Math.round(sec/60)}분</b><br><span class="note">끝까지 본 횟수(전체): ${chTxt || '-'}</span>`;
+}
+
+function renderChannels(){
+  el.chList.innerHTML = '';
+  channels.forEach((c, i) => {
+    const d = document.createElement('div'); d.className = 'ch' + (c.on ? '' : ' off');
+    const cnt = listCache[c.id] && listCache[c.id].ids ? listCache[c.id].ids.length : 0;
+    const when = listCache[c.id] ? ts(new Date(listCache[c.id].time)).slice(5,16) : '아직 안 받음';
+    d.innerHTML = `<div><b>${esc(c.name)}</b><div class="meta">${esc(c.id)} · 영상 ${cnt}개 · ${when}</div></div>`;
+    const w = document.createElement('select');
+    [[1,'추천 조금'],[2,'추천 보통'],[3,'추천 많이']].forEach(([val,lab]) => { const o=document.createElement('option'); o.value=val; o.textContent=lab; if (c.weight===val) o.selected=true; w.appendChild(o); });
+    w.addEventListener('change', () => { c.weight = +w.value; saveChannels('비중 변경', c); recFeed = buildRecommendations(); });
+    const t = document.createElement('button'); t.className='pbtn'; t.textContent = c.on ? '켜짐' : '꺼짐';
+    t.addEventListener('click', () => {
+      if (c.on && channels.filter(x=>x.on).length === 1){ toast('켜진 채널이 최소 1개는 있어야 해요'); return; }
+      c.on = !c.on; saveChannels(c.on?'채널 켬':'채널 끔', c); channelsChanged = true; renderChannels();
+    });
+    const del = document.createElement('button'); del.className='pbtn warn'; del.textContent='삭제';
+    del.addEventListener('click', () => {
+      if (channels.length === 1){ toast('채널은 최소 1개 필요해요'); return; }
+      if (del.dataset.armed !== '1'){ del.dataset.armed='1'; del.textContent='한 번 더 누르면 삭제'; setTimeout(()=>{ del.dataset.armed=''; del.textContent='삭제'; }, 3000); return; }
+      channels.splice(i,1); delete listCache[c.id]; store.set(LS.list, listCache);
+      saveChannels('채널 삭제', c); channelsChanged = true; renderChannels();
+    });
+    d.append(w, t, del); el.chList.appendChild(d);
+  });
+}
+function saveChannels(what, c){ store.set(LS.channels, channels); log('INFO', what, { id:c.id, name:c.name, on:c.on, weight:c.weight }); }
+
+function parseChannelId(text){
+  const m = String(text).match(/UC[\w-]{22}/);
+  return m ? m[0] : null;
+}
+$('chAdd').addEventListener('click', ()=>{
+  const raw = el.chId.value.trim();
+  const id = parseChannelId(raw);
+  if (!id){
+    toast(raw.includes('@') ? '@이름 주소는 안 돼요. "채널 ID 복사"로 UC… ID를 넣어 주세요' : '채널 ID(UC로 시작, 24자)를 찾지 못했어요');
+    log('WARN','채널 ID 인식 실패', raw); return;
+  }
+  if (channels.some(c=>c.id===id)){ toast('이미 있는 채널이에요'); return; }
+  const c = { id, name: el.chName.value.trim() || id, on: true, weight: 2 };
+  channels.push(c); saveChannels('채널 추가', c);
+  el.chId.value=''; el.chName.value='';
+  channelsChanged = true; renderChannels();
+  toast('추가했어요. 메뉴를 닫으면 영상을 불러와요');
+});
+$('histClear').addEventListener('click', (ev)=>{
+  const b = ev.currentTarget;
+  if (b.dataset.armed !== '1'){ b.dataset.armed='1'; b.textContent='한 번 더 누르면 지워요'; setTimeout(()=>{ b.dataset.armed=''; b.textContent='시청 기록 지우기 (추천 초기화)'; }, 3000); return; }
+  hist = {}; store.set(LS.hist, hist); log('INFO','시청 기록 지움'); renderStats(); recFeed = buildRecommendations();
+  b.dataset.armed=''; b.textContent='시청 기록 지우기 (추천 초기화)'; toast('시청 기록을 지웠어요');
+});
+
+function renderLog(){ el.logBox.value = logs.join('\n'); el.logBox.scrollTop = el.logBox.scrollHeight; el.logCount.textContent = `(${logs.length}줄)`; }
+$('logCopy').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText(logs.join('\n')); toast('로그를 복사했어요'); }
+  catch(e){ el.logBox.focus(); el.logBox.select(); toast('길게 눌러 복사하세요'); }
+});
+const IS_APP = !!window.AndroidBridge;
+if (IS_APP){
+  $('logSave').textContent = '로그 보내기(카톡 등)';
+  $('pExit').style.display = 'inline-block';
+  $('pExit').addEventListener('click', ()=>{ log('INFO','부모 메뉴에서 앱 종료'); store.set(LS.log, logs); try{ AndroidBridge.exitApp(); }catch(e){ log('ERROR','앱 종료 실패', String(e)); } });
+}
+window.onAndroidBack = function(){
+  if (el.parent.classList.contains('on')){ closeParent(); return 'handled'; }
+  if (el.playerView.classList.contains('on')){ closePlayer(); return 'handled'; }
+  return 'ignored';
+};
+$('logSave').addEventListener('click', ()=>{
+  if (IS_APP){ try{ AndroidBridge.shareLog(logs.join('\n')); }catch(e){ toast('보내기 실패 — 로그 복사를 이용하세요'); } return; }
+  try{
+    const blob = new Blob([logs.join('\r\n')], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `kids-tube-log-${ts().slice(0,10)}.txt`; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }catch(e){ toast('저장 실패 — 로그 복사를 이용하세요'); log('ERROR','로그 저장 실패', String(e)); }
+});
+$('logClear').addEventListener('click', ()=>{ logs = []; store.set(LS.log, logs); log('INFO','로그 지움'); renderLog(); });
+
+/* ---------- 홈 화면 설치용 서비스워커 ---------- */
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !IS_APP){
+  navigator.serviceWorker.register('sw.js').then(r => log('INFO','서비스워커 등록됨', r.scope)).catch(e => log('WARN','서비스워커 등록 실패', String(e)));
+}
+try{ log('INFO', '실행 형태', (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches) ? '홈 화면 앱' : '브라우저 탭'); }catch(e){}
+</script>
+</body>
+</html>
