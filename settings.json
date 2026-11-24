@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "updated": "2026-11-24T05:25:22.666Z",
-  "updatedBy": "Claude (처음 만들기)",
+  "updated": "2026-11-24T05:52:02.721Z",
+  "updatedBy": "컴퓨터",
   "channels": [
     {
       "id": "UCPlwvN0w4qFSP1FllALB92w",
@@ -76,7 +76,56 @@
       "weight": 2
     }
   ],
-  "pins": [],
+  "pins": [
+    {
+      "id": "WygnGTSlH1M",
+      "title": "마인크래프트로 들어간 뽀로로와 친구들 -미지의세계로 보물찾기!  어드벤쳐 대모험과 야생 생존기   |꿈토이| 제29화",
+      "author": "[꿈토이] DreamToy TV",
+      "added": 1795489867258
+    },
+    {
+      "id": "6qIsNSaKEiM",
+      "title": "막장뽀로로와 마인크래프트 월드! ★장난감 애니 캐릭온 TV",
+      "author": "캐릭온 TV",
+      "added": 1795489881790
+    },
+    {
+      "id": "x5KmRWfI9po",
+      "title": "마인크래프트 방탈출! 마인크래프트 세상에 떨어진 뽀로로 친구들~ 방탈출 미션을 해결할 수 있을까? ❤ 뽀로로 장난감 애니 ❤ Pororo Toy Video | 토이컴 Toycom",
+      "author": "[Toycom] 토이컴",
+      "added": 1795489905820
+    },
+    {
+      "id": "Dxhy7BHESCU",
+      "title": "유령이 나오는 비밀학교 방탈출! 보물을 찾고 단서를 기억해 탈출하라! 보드게임 ❤ 뽀로로 장난감 애니 ❤ Pororo Toy Video | 토이컴 Toycom",
+      "author": "[Toycom] 토이컴",
+      "added": 1795489923910
+    },
+    {
+      "id": "pYMoF4SfnHE",
+      "title": "슈퍼마리오 카트레이싱 보드게임 놀이~ 선물뽑기 인형뽑기 놀이는 덤 ❤ 뽀로로 장난감 애니 ❤ Pororo Toy Video | 토이컴 Toycom",
+      "author": "[Toycom] 토이컴",
+      "added": 1795489934659
+    },
+    {
+      "id": "sHFeuBlBUos",
+      "title": "Animation vs. Minecraft Shorts Season 1 - All Episodes (1-14)",
+      "author": "Alan Becker",
+      "added": 1795489976874
+    },
+    {
+      "id": "VWHTlq5Fcr8",
+      "title": "Animation vs. Minecraft Shorts Season 3 - All Episodes (20-30)",
+      "author": "Alan Becker",
+      "added": 1795489980593
+    },
+    {
+      "id": "6xcIBCur-3k",
+      "title": "Animation vs. Minecraft Shorts Season 2 - All Episodes (15-19)",
+      "author": "Alan Becker",
+      "added": 1795490010567
+    }
+  ],
   "pls": [],
   "favs": []
 }
