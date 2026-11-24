@@ -50,6 +50,17 @@
   .card .tt.wait{color:#aaa}
   .card .cn{padding:0 14px 12px;font-size:14px;color:#8a7f6c}
   .card .seen{position:absolute;top:8px;right:8px;background:#000a;color:#fff;font-size:14px;padding:3px 9px;border-radius:12px}
+  #chHeader{display:none;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px 0}
+  #chHeader .back{font-size:20px;padding:10px 18px;border-radius:22px;border:none;background:var(--c5);color:#fff}
+  #chHeader .name{font-size:30px;flex:1;min-width:200px}
+  #chHeader .name small{font-size:16px;color:#8a7f6c;margin-left:8px}
+  #chHeader .sort{display:flex;gap:8px;flex-wrap:wrap}
+  .chcard{background:#fff;border:none;border-radius:24px;padding:0;overflow:hidden;box-shadow:0 6px 0 var(--line);text-align:center;color:var(--ink)}
+  .chcard:active{transform:translateY(4px);box-shadow:0 2px 0 var(--line)}
+  .chcard .th{aspect-ratio:16/9;width:100%;display:block;object-fit:cover;background:#ddd}
+  .chcard .nm{font-size:26px;padding:12px 10px 2px}
+  .chcard .ct{font-size:16px;color:#8a7f6c;padding:0 10px 14px}
+  .card .cn{display:inline-block;margin:0 10px 10px;padding:3px 10px;border-radius:12px;background:#f3ecdf}
   #more{display:block;margin:0 auto 40px;font-size:22px;padding:12px 30px;border-radius:30px;border:none;
     background:var(--c4);color:#fff;box-shadow:0 4px 0 #1d6f65}
 
@@ -115,6 +126,7 @@
 </header>
 
 <div id="status"><span class="spin">⏳</span> 영상을 불러오는 중…</div>
+<div id="chHeader"></div>
 <div id="grid"></div>
 <button id="more" style="display:none">더 보기 ⬇</button>
 
@@ -231,7 +243,7 @@ window.addEventListener('unhandledrejection', e => log('ERROR', '처리 안 된 
 
 const $ = id => document.getElementById(id);
 const el = {
-  grid:$('grid'), status:$('status'), more:$('more'), search:$('search'), tabs:$('tabs'),
+  grid:$('grid'), chHeader:$('chHeader'), status:$('status'), more:$('more'), search:$('search'), tabs:$('tabs'),
   playerView:$('playerView'), shield:$('shield'), pausedMark:$('pausedMark'), endScreen:$('endScreen'), endCards:$('endCards'),
   btnBack:$('btnBack'), btnPlay:$('btnPlay'), btnNext:$('btnNext'), endList:$('endList'),
   nowTitle:$('nowTitle'), prog:document.querySelector('#prog i'),
@@ -280,7 +292,8 @@ let byId = new Map();
 let allowed = new Set();
 let view = [];              // 현재 화면 목록
 let shown = 0;
-let currentTab = store.get(LS.tab, 'rec') || 'rec';
+let currentTab = store.get(LS.tab, 'rec'); if (currentTab !== 'chs') currentTab = 'rec';
+let chPage = null;          // 채널 안 화면 {id, sort, order}
 let recFeed = [];
 let ytReady = false, player = null, playerReady = false;
 let current = null, progTimer = null, lastTick = 0;
@@ -368,6 +381,11 @@ async function loadAll(force){
 
 function buildVideos(){
   videos = []; byId = new Map();
+  if (chPage && !(chOf(chPage.id) && chOf(chPage.id).on)){
+    log('INFO','보던 채널이 꺼지거나 삭제됨 → 채널 화면 닫음');
+    const i = layers.map(l=>l.name).lastIndexOf('channel'); if (i>=0) layers.splice(i,1);
+    chPage = null;
+  }
   for (const ch of channels){
     if (!ch.on) continue;
     const c = listCache[ch.id]; if (!c || !c.ids) continue;
@@ -446,28 +464,121 @@ function suggestNext(cur, n){
   return buildRecommendations({ sameCh: cur && cur.ch, exclude: ex }).slice(0, n);
 }
 
+/* ---------- 화면 층 + 뒤로가기 버튼 ----------
+   채널 화면 → 재생 화면 → 부모 메뉴 순으로 쌓이고, 태블릿 뒤로가기/Esc/화면 버튼 모두 맨 위 화면만 닫음 */
+const layers = [];   // [{name, pushed}]
+function pushLayer(name){
+  if (layers.length && layers[layers.length-1].name === name) return;
+  let pushed = false;
+  try{ history.pushState({kt:name}, ''); pushed = true; }catch(e){ log('WARN','history.pushState 실패', String(e)); }
+  layers.push({ name, pushed });
+}
+function requestClose(name){
+  const i = layers.map(l=>l.name).lastIndexOf(name);
+  if (i < 0){ doClose(name); return; }
+  if (i === layers.length-1 && layers[i].pushed){ history.back(); return; }   // popstate에서 닫힘
+  layers.splice(i,1); doClose(name);
+}
+window.addEventListener('popstate', () => {
+  const top = layers.pop();
+  if (top) doClose(top.name);
+});
+function doClose(name){
+  if (name === 'parent') doCloseParent();
+  else if (name === 'player') doClosePlayer();
+  else if (name === 'channel') leaveChannel();
+}
+function closeTop(){ if (!layers.length) return false; requestClose(layers[layers.length-1].name); return true; }
+
+/* ---------- 채널 들어가기 ---------- */
+function enterChannel(id, from){
+  const ch = chOf(id); if (!ch || !ch.on) return;
+  if (chPage && chPage.id === id) return;
+  const wasOpen = !!chPage;
+  chPage = { id, sort: 'new', order: null };
+  if (!wasOpen) pushLayer('channel');
+  log('INFO', '채널 들어감', { name: ch.name, 경로: from || '' });
+  showView(); window.scrollTo(0,0);
+}
+function leaveChannel(){
+  if (!chPage) return;
+  log('INFO', '채널에서 나옴', chOf(chPage.id) ? chOf(chPage.id).name : chPage.id);
+  chPage = null; renderTabs(); showView(); window.scrollTo(0,0);
+}
+function shuffled(a){ const b=a.slice(); for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; }
+function renderChannelHeader(){
+  const ch = chOf(chPage.id);
+  const cnt = videos.filter(v=>v.ch===chPage.id).length;
+  el.chHeader.innerHTML = '';
+  el.chHeader.style.display = 'flex';
+  const back = document.createElement('button'); back.className='back'; back.textContent='← 채널 목록';
+  back.addEventListener('click', () => { currentTab = 'chs'; store.set(LS.tab,'chs'); requestClose('channel'); });
+  const nm = document.createElement('div'); nm.className='name'; nm.innerHTML = `${esc(ch?ch.name:'')}<small>영상 ${cnt}개</small>`;
+  const sort = document.createElement('div'); sort.className='sort';
+  [['new','🆕 최신'],['old','⏮ 처음부터'],['mix','🔀 섞어서']].forEach(([k,lab]) => {
+    const b = document.createElement('button'); b.className = 'tab' + (chPage.sort===k?' on':''); b.textContent = lab;
+    b.addEventListener('click', () => { chPage.sort = k; chPage.order = null; log('INFO','채널 정렬', lab); showView(); window.scrollTo(0,0); });
+    sort.appendChild(b);
+  });
+  el.chHeader.append(back, nm, sort);
+}
+function renderChannelCards(){
+  el.grid.innerHTML = ''; el.more.style.display='none';
+  const onCh = channels.filter(c => c.on && videos.some(v=>v.ch===c.id));
+  if (!onCh.length){ showStatus('채널이 없어요'); return; }
+  hideStatus();
+  onCh.forEach(c => {
+    const list = videos.filter(v=>v.ch===c.id).sort((a,b)=>a.rank-b.rank);
+    const b = document.createElement('button'); b.className='chcard';
+    b.innerHTML = `<img class="th" alt="" src="https://i.ytimg.com/vi/${esc(list[0].id)}/mqdefault.jpg">
+                   <div class="nm">${esc(c.name)}</div><div class="ct">영상 ${list.length}개 · 눌러서 들어가기</div>`;
+    b.addEventListener('click', () => enterChannel(c.id, '채널 목록'));
+    el.grid.appendChild(b);
+  });
+}
+
 /* ---------- 탭 · 목록 화면 ---------- */
 function renderTabs(){
   el.tabs.innerHTML = '';
-  const onCh = channels.filter(c=>c.on && listCache[c.id]);
-  if (currentTab !== 'rec' && !onCh.some(c=>c.id===currentTab)) currentTab = 'rec';
   const mk = (key, label) => {
     const b = document.createElement('button');
-    b.className = 'tab' + (currentTab===key ? ' on' : ''); b.textContent = label;
-    b.addEventListener('click', () => { currentTab = key; store.set(LS.tab, key); log('INFO','탭 선택', label); renderTabs(); showView(); window.scrollTo(0,0); });
+    b.className = 'tab' + (!chPage && currentTab===key ? ' on' : ''); b.textContent = label;
+    b.addEventListener('click', () => {
+      currentTab = key; store.set(LS.tab, key); log('INFO','탭 선택', label);
+      if (chPage){ requestClose('channel'); return; }   // 채널 화면이면 닫으면서 이 탭으로
+      renderTabs(); showView(); window.scrollTo(0,0);
+    });
     el.tabs.appendChild(b);
   };
   mk('rec', '⭐ 추천');
-  if (onCh.length > 1) onCh.forEach(c => mk(c.id, c.name));
-  else if (onCh.length === 1) mk(onCh[0].id, `🆕 ${onCh[0].name} 최신`);
+  mk('chs', '📺 채널');
   const r = document.createElement('button'); r.id='refreshRec'; r.textContent='🔄 새 추천';
-  r.addEventListener('click', () => { recFeed = buildRecommendations(); currentTab='rec'; store.set(LS.tab,'rec'); renderTabs(); showView(); window.scrollTo(0,0); toast('새로운 추천이에요!'); });
+  r.addEventListener('click', () => {
+    recFeed = buildRecommendations(); currentTab='rec'; store.set(LS.tab,'rec'); toast('새로운 추천이에요!');
+    if (chPage){ requestClose('channel'); return; }
+    renderTabs(); showView(); window.scrollTo(0,0);
+  });
   el.tabs.appendChild(r);
 }
 function showView(){
   const q = el.search.value.trim().toLowerCase();
-  let base = currentTab === 'rec' ? recFeed : videos.filter(v=>v.ch===currentTab).sort((a,b)=>a.rank-b.rank);
-  view = q ? videos.filter(v => (titles[v.id]||'').toLowerCase().includes(q)) : base;
+  const byTitle = v => (titles[v.id]||'').toLowerCase().includes(q);
+  el.chHeader.style.display = 'none';
+  renderTabs();
+  if (chPage){
+    renderChannelHeader();
+    let list = videos.filter(v=>v.ch===chPage.id);
+    if (chPage.sort === 'old') list.sort((a,b)=>b.rank-a.rank);
+    else if (chPage.sort === 'mix'){ if (!chPage.order) chPage.order = shuffled(list).map(v=>v.id); const pos = new Map(chPage.order.map((id,i)=>[id,i])); list.sort((a,b)=>(pos.get(a.id)??1e9)-(pos.get(b.id)??1e9)); }
+    else list.sort((a,b)=>a.rank-b.rank);
+    view = q ? list.filter(byTitle) : list;
+  } else if (q){
+    view = videos.filter(byTitle);
+  } else if (currentTab === 'chs'){
+    renderChannelCards(); return;
+  } else {
+    view = recFeed;
+  }
   el.grid.innerHTML = ''; shown = 0;
   if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : '영상이 없어요'); else hideStatus();
   renderMore();
@@ -480,8 +591,11 @@ function cardEl(v, onClick){
   b.innerHTML = `<img class="th" loading="lazy" alt="" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg">
      ${seenToday ? '<span class="seen">봤어요 ✓</span>' : ''}
      <div class="tt ${t?'':'wait'}">${t?esc(t):'…'}</div>
-     <div class="cn">${esc(ch ? ch.name : '')}</div>`;
-  b.addEventListener('click', onClick || (() => play(v.id, '목록')));
+     <span class="cn">📺 ${esc(ch ? ch.name : '')}</span>`;
+  b.addEventListener('click', onClick || (() => play(v.id, chPage ? '채널 화면' : '목록')));
+  // 채널 이름을 누르면 그 채널로 들어감 (재생 화면·끝 화면에서는 재생만)
+  const cn = b.querySelector('.cn');
+  if (!onClick) cn.addEventListener('click', e => { e.stopPropagation(); enterChannel(v.ch, '채널 이름'); });
   return b;
 }
 function renderMore(){
@@ -562,6 +676,7 @@ function play(id, from){
   if (!allowed.has(id)){ log('WARN','허용 목록에 없는 영상 재생 시도 차단', id); return; }
   finishWatch('다른 영상 선택');
   current = { id, ch: byId.get(id).ch, start: Date.now(), sec: 0 };
+  if (!el.playerView.classList.contains('on')) pushLayer('player');
   el.playerView.classList.add('on');
   el.endScreen.classList.remove('on');
   el.nowTitle.textContent = titles[id] || '';
@@ -638,7 +753,8 @@ function next(){
   if (!pick) return closePlayer();
   play(pick.id, '다음 버튼');
 }
-function closePlayer(){
+function closePlayer(){ requestClose('player'); }
+function doClosePlayer(){
   finishWatch('목록으로');
   try{ player && playerReady && player.stopVideo(); }catch(e){}
   el.playerView.classList.remove('on');
@@ -668,8 +784,7 @@ el.btnNext.addEventListener('click', next);
 el.endList.addEventListener('click', closePlayer);
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){
-    if (el.parent.classList.contains('on')) closeParent();
-    else if (el.playerView.classList.contains('on')) closePlayer();
+    closeTop();
   }
 });
 document.addEventListener('visibilitychange', () => {
@@ -689,14 +804,15 @@ el.lockBtn.addEventListener('pointerdown', holdBegin);
 ['pointerup','pointerleave','pointercancel'].forEach(ev => el.lockBtn.addEventListener(ev, holdEnd));
 el.lockBtn.addEventListener('click', ()=>toast('어른이 3초 꾹 눌러요 🔒'));
 
-function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderStats(); renderLog(); el.parent.classList.add('on'); }
+function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderStats(); renderLog(); pushLayer('parent'); el.parent.classList.add('on'); }
 let channelsChanged = false;
-function closeParent(){
+function closeParent(){ requestClose('parent'); }
+function doCloseParent(){
   el.parent.classList.remove('on');
   if (channelsChanged){ channelsChanged = false; loadAll(false); }
 }
 $('pClose').addEventListener('click', closeParent);
-$('pRefresh').addEventListener('click', ()=>{ channelsChanged = false; el.parent.classList.remove('on'); log('INFO','수동 새로고침'); loadAll(true); });
+$('pRefresh').addEventListener('click', ()=>{ channelsChanged = false; closeParent(); log('INFO','수동 새로고침'); loadAll(true); });
 
 function renderStats(){
   const dayStart = new Date(); dayStart.setHours(0,0,0,0);
@@ -775,11 +891,7 @@ if (IS_APP){
   $('pExit').style.display = 'inline-block';
   $('pExit').addEventListener('click', ()=>{ log('INFO','부모 메뉴에서 앱 종료'); store.set(LS.log, logs); try{ AndroidBridge.exitApp(); }catch(e){ log('ERROR','앱 종료 실패', String(e)); } });
 }
-window.onAndroidBack = function(){
-  if (el.parent.classList.contains('on')){ closeParent(); return 'handled'; }
-  if (el.playerView.classList.contains('on')){ closePlayer(); return 'handled'; }
-  return 'ignored';
-};
+window.onAndroidBack = function(){ return closeTop() ? 'handled' : 'ignored'; };
 $('logSave').addEventListener('click', ()=>{
   if (IS_APP){ try{ AndroidBridge.shareLog(logs.join('\n')); }catch(e){ toast('보내기 실패 — 로그 복사를 이용하세요'); } return; }
   try{
