@@ -213,6 +213,21 @@
       · 오늘 이미 본 영상만 맨 뒤로 가요. 채널 화면에서는 🔥 인기순 / 🆕 최신 / ⏮ 처음부터로 볼 수 있어요.</p>
     <div class="row"><button class="pbtn warn" id="histClear">시청 기록 지우기 (추천 초기화)</button></div>
 
+    <h3>🔄 모든 기기 같은 설정 (동기화)</h3>
+    <div class="stat" id="syncBox">확인 중…</div>
+    <div class="row" style="margin-top:8px">
+      <input id="devName" placeholder="이 기기 이름 (예: 은준이 태블릿)" style="width:200px">
+      <input id="syncTok" type="password" autocomplete="off" placeholder="GitHub 토큰 (설정 바꾸는 기기에만)" style="flex:1;min-width:220px">
+      <button class="pbtn main" id="syncSave">저장</button>
+      <button class="pbtn" id="syncNow">지금 동기화</button>
+      <button class="pbtn warn" id="syncDel">토큰 지우기</button>
+    </div>
+    <p class="note">· 채널 켜기/끄기·비중, 지정 영상, 재생목록, 즐겨찾기가 모든 기기에 똑같이 적용돼요. (시청 기록은 기기별)<br>
+      · 보기만 하는 기기는 아무것도 안 해도 돼요. <b>설정을 바꾸는 기기</b>에만 토큰을 한 번 넣으면, 바꾼 내용이 모든 기기에 퍼져요.<br>
+      · 토큰 만들기: GitHub → 오른쪽 위 프로필 → Settings → 맨 아래 Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token →
+        Repository access: <b>Only select repositories → kids-tube</b> → Permissions → Repository permissions → <b>Contents: Read and write</b> → Generate.
+        나온 토큰(github_pat_…)을 복사해 위 칸에 붙여 넣고 저장하세요. 토큰은 이 기기 안에만 저장되고 GitHub에만 보내져요. 다른 사람에게 보여주지 마세요.</p>
+
     <h3>📝 로그 <span class="note" id="logCount"></span></h3>
     <textarea id="logBox" readonly></textarea>
     <div class="row" style="margin-top:8px">
@@ -362,6 +377,7 @@ function toggleFav(id, from){
   if (isFav(id)){ favs = favs.filter(f=>f.id!==id); toast('즐겨찾기에서 뺐어요'); log('INFO','즐겨찾기 해제', { id, from }); }
   else { favs.unshift({ id, added: Date.now() }); toast('❤️ 즐겨찾기에 넣었어요!'); log('INFO','즐겨찾기 추가', { id, title: titles[id]||'', from }); }
   store.set(LS.favs, favs);
+  recordOp('favs', id, isFav(id) ? favs.find(f=>f.id===id) : null);
   document.querySelectorAll(`.card[data-id="${id}"] .fav`).forEach(n => n.textContent = isFav(id) ? '❤️' : '🤍');
   updateFavBtn();
   if (currentTab === 'fav' && !chPage && !el.playerView.classList.contains('on')) showView();
@@ -443,8 +459,15 @@ async function fetchChannelData(ch){
   return r;
 }
 
+let loading = false, reloadAgain = null;
 async function loadAll(force){
   if (!ytReady) return;
+  if (loading){ reloadAgain = reloadAgain || !!force; return; }   // 불러오는 중이면 끝난 뒤 한 번 더
+  loading = true;
+  try{ await loadAllInner(force); } finally { loading = false; }
+  if (reloadAgain !== null){ const f = reloadAgain; reloadAgain = null; loadAll(f); }
+}
+async function loadAllInner(force){
   showStatus('<span class="spin">⏳</span> 영상을 불러오는 중…');
   el.grid.innerHTML=''; el.more.style.display='none';
   const need = channels.filter(c => { const k = listCache[c.id];
@@ -1029,7 +1052,7 @@ el.lockBtn.addEventListener('pointerdown', holdBegin);
 ['pointerup','pointerleave','pointercancel'].forEach(ev => el.lockBtn.addEventListener(ev, holdEnd));
 el.lockBtn.addEventListener('click', ()=>toast('어른이 3초 꾹 눌러요 🔒'));
 
-function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderPins(); renderPls(); renderStats(); renderLog(); pushLayer('parent'); el.parent.classList.add('on'); }
+function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderPins(); renderPls(); renderSync(); renderStats(); renderLog(); pushLayer('parent'); el.parent.classList.add('on'); }
 let channelsChanged = false;
 function closeParent(){ requestClose('parent'); }
 function doCloseParent(){
@@ -1094,7 +1117,7 @@ function renderPls(){
     const del = document.createElement('button'); del.className='pbtn warn'; del.textContent='삭제';
     del.addEventListener('click', () => {
       if (del.dataset.armed !== '1'){ del.dataset.armed='1'; del.textContent='한 번 더 누르면 삭제'; setTimeout(()=>{ del.dataset.armed=''; del.textContent='삭제'; }, 3000); return; }
-      pls.splice(i,1); store.set(LS.pls, pls); log('INFO','재생목록 삭제', pl);
+      pls.splice(i,1); store.set(LS.pls, pls); log('INFO','재생목록 삭제', pl); recordOp('pls', pl.id, null);
       channelsChanged = true; renderPls();
     });
     d.appendChild(del); el.plList.appendChild(d);
@@ -1111,7 +1134,7 @@ $('plAdd').addEventListener('click', async () => {
   try{ j = await getPlaylistInfo(id); } finally { btn.disabled = false; btn.textContent = '재생목록 추가'; }
   if (!j) log('WARN','재생목록 정보 확인 실패(그래도 추가)', id);
   const pl = { id, title: el.plName.value.trim() || (j && j.title) || '재생목록', author: (j && j.author_name) || '', added: Date.now() };
-  pls.push(pl); store.set(LS.pls, pls);
+  pls.push(pl); store.set(LS.pls, pls); recordOp('pls', pl.id, pl);
   log('INFO','재생목록 추가', pl);
   el.plIn.value=''; el.plName.value='';
   channelsChanged = true; renderPls();
@@ -1129,7 +1152,7 @@ function renderPins(){
     const del = document.createElement('button'); del.className='pbtn warn'; del.textContent='삭제';
     del.addEventListener('click', () => {
       if (del.dataset.armed !== '1'){ del.dataset.armed='1'; del.textContent='한 번 더 누르면 삭제'; setTimeout(()=>{ del.dataset.armed=''; del.textContent='삭제'; }, 3000); return; }
-      pins.splice(i,1); store.set(LS.pins, pins); log('INFO','지정 영상 삭제', pn);
+      pins.splice(i,1); store.set(LS.pins, pins); log('INFO','지정 영상 삭제', pn); recordOp('pins', pn.id, null);
       channelsChanged = true; renderPins();
     });
     d.appendChild(del); el.pinList.appendChild(d);
@@ -1149,7 +1172,7 @@ $('pinAdd').addEventListener('click', async () => {
       const j = await getOembed(id);   // 영상이 실제로 있는지·제목 확인
       if (!j) log('WARN','지정 영상 정보 확인 실패(그래도 추가)', id);
       const pn = { id, title: (ids.length===1 && name) || (j && j.title) || '', author: (j && j.author_name) || '', added: Date.now() };
-      pins.push(pn); added++;
+      pins.push(pn); added++; recordOp('pins', pn.id, pn);
       if (pn.title) titles[id] = pn.title;
       log('INFO','지정 영상 추가', pn);
     }
@@ -1185,7 +1208,11 @@ function renderChannels(){
     d.append(w, t, del); el.chList.appendChild(d);
   });
 }
-function saveChannels(what, c){ store.set(LS.channels, channels); log('INFO', what, { id:c.id, name:c.name, on:c.on, weight:c.weight }); }
+function saveChannels(what, c){
+  store.set(LS.channels, channels); log('INFO', what, { id:c.id, name:c.name, on:c.on, weight:c.weight });
+  const now = channels.find(x=>x.id===c.id);
+  recordOp('channels', c.id, now ? { id: now.id, name: now.name, on: now.on, weight: now.weight } : null);
+}
 
 function parseChannelId(text){
   const m = String(text).match(/UC[\w-]{22}/);
@@ -1234,6 +1261,176 @@ $('logSave').addEventListener('click', ()=>{
   }catch(e){ toast('저장 실패 — 로그 복사를 이용하세요'); log('ERROR','로그 저장 실패', String(e)); }
 });
 $('logClear').addEventListener('click', ()=>{ logs = []; store.set(LS.log, logs); log('INFO','로그 지움'); renderLog(); });
+
+/* =========================================================
+   모든 기기 동기화 — GitHub 저장소의 settings.json 을 '정답'으로 사용
+   · 읽기: 모든 기기 (토큰 필요 없음)
+   · 쓰기: 토큰을 넣은 기기만. 바꾼 내용은 '변경 기록(ops)'으로 쌓았다가
+           최신 settings.json 위에 다시 적용해서 저장 → 두 기기가 동시에 바꿔도 안 덮어씀
+   ========================================================= */
+const SYNC = { owner: 'egjfam', repo: 'kids-tube', path: 'settings.json', branch: 'main' };
+const SYNC_KEYS = ['channels', 'pins', 'pls', 'favs'];
+LS.syncTok = 'kt_sync_token'; LS.syncOps = 'kt_sync_ops'; LS.syncInfo = 'kt_sync_info'; LS.dev = 'kt_device';
+let syncOps = store.get(LS.syncOps, []); if (!Array.isArray(syncOps)) syncOps = [];
+let syncInfo = store.get(LS.syncInfo, {}) || {};   // {time, sha, updated, updatedBy, error}
+let syncBusy = false, syncTimer = null;
+const syncTok = () => store.get(LS.syncTok, '') || '';
+const devName = () => store.get(LS.dev, '') || (IS_APP ? '안드로이드 앱' : (/Android|iPad|Mobile/i.test(navigator.userAgent) ? '태블릿/폰' : 'PC'));
+
+function b64enc(str){ const bytes = new TextEncoder().encode(str); let bin = ''; for (let i=0;i<bytes.length;i+=0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i+0x8000)); return btoa(bin); }
+function b64dec(b64){ const bin = atob(String(b64).replace(/\s/g,'')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); }
+function snapshot(){ return { channels: channels.map(c=>({ id:c.id, name:c.name, on:c.on, weight:c.weight })), pins, pls, favs }; }
+function sameJSON(a, b){ try{ return JSON.stringify(a) === JSON.stringify(b); }catch(e){ return false; } }
+
+function recordOp(key, id, value){
+  syncOps.push({ key, id, value: value ? JSON.parse(JSON.stringify(value)) : null, at: Date.now() });
+  if (syncOps.length > 500) syncOps.splice(0, syncOps.length - 500);
+  store.set(LS.syncOps, syncOps);
+  if (syncTok()){ clearTimeout(syncTimer); syncTimer = setTimeout(() => pushSync('변경 저장'), 1500); }
+  renderSync();
+}
+function applyOps(data, ops){
+  const d = JSON.parse(JSON.stringify(data || {}));
+  for (const op of ops){
+    if (!SYNC_KEYS.includes(op.key)) continue;
+    const arr = Array.isArray(d[op.key]) ? d[op.key] : (d[op.key] = []);
+    const i = arr.findIndex(x => x && x.id === op.id);
+    if (!op.value){ if (i >= 0) arr.splice(i, 1); }
+    else if (i >= 0) arr[i] = op.value;
+    else if (op.key === 'favs') arr.unshift(op.value); else arr.push(op.value);
+  }
+  return d;
+}
+async function fetchRemote(){
+  const tok = syncTok();
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (tok) headers.Authorization = 'Bearer ' + tok;
+  try{
+    const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), 12000);
+    const r = await fetch(`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.path}?ref=${SYNC.branch}&t=${Date.now()}`, { headers, cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.status === 404) return { missing: true, sha: null, data: null, via: 'api' };
+    if (r.ok){ const j = await r.json(); return { sha: j.sha, data: JSON.parse(b64dec(j.content)), via: 'api' }; }
+    log('WARN', '설정 읽기(API) 실패', { status: r.status, 토큰: !!tok });
+    if ((r.status === 401 || r.status === 403) && tok) syncInfo.error = r.status === 401 ? '토큰이 틀렸거나 만료됐어요' : '토큰 권한이 부족하거나 요청이 너무 많아요';
+  }catch(e){ log('WARN', '설정 읽기(API) 오류', String(e)); }
+  // 비상용: 웹사이트에 올라간 settings.json (최대 1~2분 늦을 수 있음)
+  try{
+    const r = await fetch('settings.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) return { sha: null, data: await r.json(), via: 'pages' };
+  }catch(e){}
+  return null;
+}
+function applyState(d, why){
+  const before = snapshot();
+  if (Array.isArray(d.channels) && d.channels.length){
+    channels = d.channels.filter(c => c && /^UC[\w-]{22}$/.test(c.id)).map(c => ({ id:c.id, name:c.name||c.id, on:c.on!==false, weight:[1,2,3].includes(c.weight)?c.weight:2 }));
+  }
+  pins = Array.isArray(d.pins) ? d.pins.filter(x=>x && /^[\w-]{11}$/.test(x.id)) : [];
+  pls  = Array.isArray(d.pls)  ? d.pls.filter(x=>x && x.id) : [];
+  favs = Array.isArray(d.favs) ? d.favs.filter(x=>x && x.id) : [];
+  store.set(LS.channels, channels); store.set(LS.pins, pins); store.set(LS.pls, pls); store.set(LS.favs, favs);
+  const changed = !sameJSON(before, snapshot());
+  if (changed){
+    log('INFO', '동기화 설정 적용', { 이유: why, 채널: channels.length, 지정영상: pins.length, 재생목록: pls.length, 즐겨찾기: favs.length });
+    if (el.parent.classList.contains('on')){ channelsChanged = true; renderChannels(); renderPins(); renderPls(); }
+    else if (ytReady) loadAll(false);
+  }
+  return changed;
+}
+// 이 기기에만 있던 예전 설정을 처음 한 번 '변경 기록'으로 옮김 (지우지 않고 합치기)
+function migrateLocal(remote){
+  if (store.get('kt_sync_migrated', false)) return;
+  const local = snapshot(), add = [];
+  for (const k of ['pins','pls','favs']) for (const it of local[k]) if (!(remote[k]||[]).some(x=>x.id===it.id)) add.push({ key:k, id:it.id, value:it, at:Date.now() });
+  for (const c of local.channels){
+    const rc = (remote.channels||[]).find(x=>x.id===c.id);
+    if (!rc || rc.on !== c.on || rc.weight !== c.weight) add.push({ key:'channels', id:c.id, value:c, at:Date.now() });
+  }
+  if (add.length){ syncOps = add.concat(syncOps); store.set(LS.syncOps, syncOps); log('INFO', '이 기기 기존 설정을 동기화에 합침', add.length + '개'); }
+  store.set('kt_sync_migrated', true);
+}
+async function pullSync(why){
+  if (syncBusy) return;
+  syncBusy = true;
+  try{
+    const remote = await fetchRemote();
+    if (!remote){ syncInfo.error = '인터넷이 안 되거나 GitHub에 연결 못 함 — 이 기기에 저장된 설정으로 동작'; return; }
+    if (remote.missing){ log('WARN', 'settings.json 없음'); if (syncTok()) { syncBusy = false; await pushSync('처음 만들기'); } return; }
+    migrateLocal(remote.data);
+    syncInfo = { ...syncInfo, time: Date.now(), sha: remote.sha || syncInfo.sha, updated: remote.data.updated, updatedBy: remote.data.updatedBy, via: remote.via, error: syncInfo.error && syncTok() ? syncInfo.error : '' };
+    applyState(applyOps(remote.data, syncOps), why);
+    if (syncOps.length && syncTok()){ syncBusy = false; await pushSync('보내지 못한 변경'); }
+  } finally { syncBusy = false; store.set(LS.syncInfo, syncInfo); renderSync(); }
+}
+async function pushSync(why){
+  const tok = syncTok();
+  if (!tok || !syncOps.length || syncBusy) { renderSync(); return false; }
+  syncBusy = true; renderSync('저장 중…');
+  try{
+    for (let attempt = 1; attempt <= 3; attempt++){
+      const remote = await fetchRemote();
+      if (!remote || remote.via !== 'api'){ syncInfo.error = 'GitHub에 연결 못 해서 저장 못 함 (나중에 자동 재시도)'; return false; }
+      const base = remote.missing ? snapshot() : remote.data;
+      const ops = remote.missing ? [] : syncOps.slice();
+      const data = applyOps(base, ops);
+      data.version = 1; data.updated = new Date().toISOString(); data.updatedBy = devName();
+      const body = { message: `영상관 설정 변경 — ${devName()} (${why})`, content: b64enc(JSON.stringify(data, null, 2) + '\n'), branch: SYNC.branch };
+      if (remote.sha) body.sha = remote.sha;
+      const r = await fetch(`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.path}`, {
+        method: 'PUT', headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      if (r.ok){
+        const j = await r.json();
+        syncOps = syncOps.slice(ops.length); store.set(LS.syncOps, syncOps);
+        syncInfo = { time: Date.now(), sha: j.content && j.content.sha, updated: data.updated, updatedBy: data.updatedBy, via: 'api', error: '' };
+        log('INFO', '동기화 저장 완료', { 이유: why, 변경: ops.length, 시도: attempt });
+        applyState(applyOps(data, syncOps), '저장 후');
+        return true;
+      }
+      if (r.status === 409 || r.status === 422){ log('WARN', '동시에 바뀜 → 최신으로 다시 시도', { status: r.status, attempt }); continue; }
+      const msg = r.status === 401 ? '토큰이 틀렸거나 만료됐어요' : r.status === 403 || r.status === 404 ? '토큰 권한 부족 (kids-tube 저장소 · Contents 읽기/쓰기 확인)' : '저장 실패 (' + r.status + ')';
+      syncInfo.error = msg; log('ERROR', '동기화 저장 실패', { status: r.status, msg });
+      return false;
+    }
+    syncInfo.error = '여러 번 겹쳐서 저장 못 함 — 잠시 뒤 자동 재시도'; return false;
+  }catch(e){
+    syncInfo.error = '저장 중 오류 — 나중에 자동 재시도'; log('ERROR', '동기화 저장 오류', String(e)); return false;
+  } finally { syncBusy = false; store.set(LS.syncInfo, syncInfo); renderSync(); }
+}
+function renderSync(busyText){
+  const box = $('syncBox'); if (!box) return;
+  const t = syncInfo.time ? ts(new Date(syncInfo.time)).slice(5,16) : '아직 안 함';
+  const upd = syncInfo.updated ? `${ts(new Date(syncInfo.updated)).slice(5,16)} · ${esc(syncInfo.updatedBy||'')}` : '-';
+  box.innerHTML = `${busyText ? '⏳ ' + busyText + '<br>' : ''}`
+    + `이 기기: <b>${esc(devName())}</b> · 토큰 ${syncTok() ? '<b style="color:#2a9d8f">있음 (바꾸면 모든 기기에 저장)</b>' : '<b>없음 (보기 전용 — 여기서 바꾼 건 이 기기에만)</b>'}<br>`
+    + `마지막 확인: ${t} · 설정 최종 변경: ${upd}`
+    + (syncOps.length ? `<br>⚠ 아직 모든 기기에 안 보낸 변경 <b>${syncOps.length}개</b>${syncTok() ? ' (곧 자동 저장)' : ' — 토큰을 넣으면 보내져요'}` : '')
+    + (syncInfo.error ? `<br><span style="color:#c0392b">⚠ ${esc(syncInfo.error)}</span>` : '');
+  const dn = $('devName'); if (dn && document.activeElement !== dn) dn.value = store.get(LS.dev, '') || '';
+}
+$('syncSave').addEventListener('click', async () => {
+  const name = $('devName').value.trim(); if (name) store.set(LS.dev, name);
+  const tok = $('syncTok').value.trim();
+  if (tok){
+    if (!/^(github_pat_|ghp_)[\w]+$/.test(tok)){ toast('토큰 모양이 이상해요 (github_pat_… 로 시작)'); return; }
+    store.set(LS.syncTok, tok); $('syncTok').value = '';
+    log('INFO', '동기화 토큰 저장됨 (값은 기록 안 함)');
+  }
+  syncInfo.error = ''; toast('저장했어요. 동기화 확인 중…');
+  await pullSync('토큰 저장'); await pushSync('토큰 저장 후');
+  toast(syncInfo.error ? '⚠ ' + syncInfo.error : '모든 기기 동기화 준비 완료!');
+});
+$('syncNow').addEventListener('click', async () => { log('INFO','수동 동기화'); syncInfo.error=''; await pullSync('수동'); await pushSync('수동'); toast(syncInfo.error ? '⚠ ' + syncInfo.error : '동기화했어요'); });
+$('syncDel').addEventListener('click', (ev) => {
+  const b = ev.currentTarget;
+  if (b.dataset.armed !== '1'){ b.dataset.armed='1'; b.textContent='한 번 더 누르면 지워요'; setTimeout(()=>{ b.dataset.armed=''; b.textContent='토큰 지우기'; }, 3000); return; }
+  store.set(LS.syncTok, ''); b.dataset.armed=''; b.textContent='토큰 지우기'; log('INFO','동기화 토큰 지움'); renderSync(); toast('토큰을 지웠어요');
+});
+// 시작할 때, 화면에 다시 들어올 때, 5분마다 최신 설정 확인
+pullSync('시작');
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pullSync('다시 열림'); });
+setInterval(() => { if (!document.hidden) pullSync('주기 확인'); }, 5 * 60 * 1000);
 
 /* ---------- 홈 화면 설치용 서비스워커 ---------- */
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !IS_APP){

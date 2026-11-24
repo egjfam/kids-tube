@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "updated": "2026-11-24T05:25:22.666Z",
+  "updatedBy": "Claude (처음 만들기)",
+  "channels": [
+    {
+      "id": "UCPlwvN0w4qFSP1FllALB92w",
+      "name": "Numberblocks",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UC_qs3c0ehDvZkbiEbOj6Drg",
+      "name": "Alphablocks",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCQkuKPaVlYK7QCIVTb0lV2Q",
+      "name": "Colourblocks",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCLsooMJoIpl_7ux2jvdPB-Q",
+      "name": "Super Simple Songs",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCoookXUzPciGrEZEXmh4Jjg",
+      "name": "Sesame Street",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCVcQH8A634mauPrGbWs7QlQ",
+      "name": "Jack Hartmann",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCRFIPG2u1DxKLNuE3y2SjHA",
+      "name": "SciShow Kids",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UC5XMF3Inoi8R9nSI8ChOsdQ",
+      "name": "Art For Kids Hub",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UC5uIZ2KOZZeQDQo_Gsi_qbQ",
+      "name": "Cosmic Kids Yoga",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCnBdzaRy-Ky9Vh54XJlFz1Q",
+      "name": "Storyline Online",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCKEGG4zVP3CGS_YSQOf654w",
+      "name": "바다 탐험대 옥토넛",
+      "on": true,
+      "weight": 2
+    },
+    {
+      "id": "UCx_dzPI6efSohgtOkAG43-A",
+      "name": "EBS 키즈",
+      "on": true,
+      "weight": 2
+    }
+  ],
+  "pins": [],
+  "pls": [],
+  "favs": []
+}
