@@ -1,6 +1,6 @@
 // 홈 화면 '설치'가 되도록 하는 최소 서비스워커.
 // 내 페이지(index.html 등)는 인터넷이 끊겼을 때를 대비해 보관해 두고, 유튜브 등 다른 주소는 건드리지 않음.
-const CACHE = 'kids-tube-v6';
+const CACHE = 'kids-tube-v7';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).catch(() => {}));

@@ -221,13 +221,23 @@
 const DEFAULT_CHANNELS = [
   { id: 'UCPlwvN0w4qFSP1FllALB92w', name: 'Numberblocks', on: true, weight: 2 },   // 넘버블럭스 영어 공식
   { id: 'UC_qs3c0ehDvZkbiEbOj6Drg', name: 'Alphablocks',  on: true, weight: 2 },   // 알파블럭스 공식
-  { id: 'UCQkuKPaVlYK7QCIVTb0lV2Q', name: 'Colourblocks', on: true, weight: 2 }    // 컬러블럭스 공식
+  { id: 'UCQkuKPaVlYK7QCIVTb0lV2Q', name: 'Colourblocks', on: true, weight: 2 },   // 컬러블럭스 공식
+  // 2026-11-24 추가 (유튜브에서 채널 이름·핸들 직접 확인)
+  { id: 'UCLsooMJoIpl_7ux2jvdPB-Q', name: 'Super Simple Songs', on: true, weight: 2 },        // @SuperSimpleSongs
+  { id: 'UCoookXUzPciGrEZEXmh4Jjg', name: 'Sesame Street', on: true, weight: 2 },             // @SesameStreet
+  { id: 'UCVcQH8A634mauPrGbWs7QlQ', name: 'Jack Hartmann', on: true, weight: 2 },             // @JackHartmann
+  { id: 'UCRFIPG2u1DxKLNuE3y2SjHA', name: 'SciShow Kids', on: true, weight: 2 },              // @SciShowKids
+  { id: 'UCXVCgDuD_QCkI7gTKU7-tpg', name: 'Nat Geo Kids', on: true, weight: 2 },              // @natgeokids
+  { id: 'UC5XMF3Inoi8R9nSI8ChOsdQ', name: 'Art For Kids Hub', on: true, weight: 2 },          // @artforkidshub
+  { id: 'UC5uIZ2KOZZeQDQo_Gsi_qbQ', name: 'Cosmic Kids Yoga', on: true, weight: 2 },          // @CosmicKidsYoga
+  { id: 'UCnBdzaRy-Ky9Vh54XJlFz1Q', name: 'Storyline Online', on: true, weight: 2 },          // @StorylineOnline
+  { id: 'UCKEGG4zVP3CGS_YSQOf654w', name: '바다 탐험대 옥토넛', on: true, weight: 2 }          // @OctonautsKorea
 ];
 const PAGE_SIZE = 40;
 const LOAD_TIMEOUT_MS = 25000;
 const LIST_CACHE_HOURS = 12;
 const TITLE_CONCURRENCY = 4;
-const CHANNEL_CONCURRENCY = 2;
+const CHANNEL_CONCURRENCY = 3;
 const LS = { channels:'kt_channels_v2', list:'kt_list_v2', titles:'kt_titles', bad:'kt_bad', log:'kt_log', hist:'kt_hist', tab:'kt_tab', favs:'kt_favs', pins:'kt_pins' };
 
 /* ---------- 저장소 (막혀 있어도 동작) ---------- */
@@ -412,6 +422,7 @@ async function loadAll(force){
   async function worker(){
     while (idx < need.length){
       const ch = need[idx++];
+      showStatus(`<span class="spin">⏳</span> 영상을 불러오는 중… (${Math.min(idx, need.length)}/${need.length} 채널)<br><small>처음 한 번만 조금 오래 걸려요</small>`);
       try{
         const d = await fetchChannelData(ch);
         listCache[ch.id] = d;
