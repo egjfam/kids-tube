@@ -83,6 +83,12 @@
   #endList{font-size:24px;padding:12px 28px;border:none;border-radius:40px;background:var(--c5);color:#fff}
   #controls{display:flex;gap:16px;justify-content:center;align-items:center;padding:12px;background:#1b1b24}
   #controls button{font-size:26px;border:none;border-radius:40px;padding:14px 28px;color:#fff;min-width:120px}
+  #btnFav{background:#c2185b}
+  .card .fav{position:absolute;top:6px;left:6px;width:52px;height:52px;border-radius:50%;border:none;background:#fffd;
+    font-size:28px;line-height:52px;text-align:center;box-shadow:0 2px 6px #0003;z-index:1}
+  .card .cn.pin{background:#fde2e4}
+  #parent .pv{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;padding:6px 8px;border:1px solid #eee;border-radius:8px;margin-bottom:6px;font-size:14px}
+  #parent .pv img{width:96px;border-radius:6px;display:block}
   #btnBack{background:var(--c5)} #btnPlay{background:var(--c4)} #btnNext{background:var(--c2)}
   #nowTitle{color:#ddd;font-size:18px;text-align:center;padding:6px 10px 0;background:#1b1b24;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -146,6 +152,7 @@
   <div id="controls">
     <button id="btnBack">◀ 목록</button>
     <button id="btnPlay">⏸ 멈춤</button>
+    <button id="btnFav">🤍 즐겨찾기</button>
     <button id="btnNext">다음 ▶</button>
   </div>
 </div>
@@ -176,8 +183,20 @@
       · <b>추천 비중</b>: "많이"로 두면 그 채널 영상이 추천에 더 자주 나와요. "끔"은 잠시 숨기기(삭제 아님).
     </p>
 
+    <h3>📌 지정 영상 <span class="note">— 채널 전체가 아니라 여기 넣은 영상만 허용</span></h3>
+    <div id="pinList"></div>
+    <div class="row">
+      <input id="pinIn" placeholder="영상 주소 (유튜브 앱 → 공유 → 링크 복사) 또는 영상 ID" style="flex:1;min-width:260px">
+      <input id="pinName" placeholder="표시 이름 (비우면 자동)" style="width:170px">
+      <button class="pbtn main" id="pinAdd">영상 추가</button>
+    </div>
+    <p class="note">· 지정 영상은 "📌 지정 영상" 탭에만 나오고, 그 영상의 채널 다른 영상은 나오지 않아요.<br>
+      · 여러 개를 한 번에 넣으려면 주소를 줄바꿈이나 띄어쓰기로 이어서 붙여 넣어도 돼요.</p>
+
     <h3>🧠 추천 방식</h3>
-    <p class="note">추천 = 허용 채널 영상만 섞어서 → 최신 영상 우선 + 은준이가 끝까지 잘 본 채널 우선 + 오늘 본 영상은 뒤로, 금방 꺼버린 영상은 덜 나오게 + 같은 채널이 3개 이상 연달아 나오지 않게.</p>
+    <p class="note">· 쇼츠는 나오지 않아요 (유튜브의 '일반 영상' 목록만 사용 + 쇼츠 목록으로 한 번 더 걸러냄).<br>
+      · 추천 = 각 채널의 <b>조회수 높은 순</b>을 채널끼리 번갈아 보여줌. 채널 비중 "조금/보통/많이" = 한 바퀴에 1/2/3개씩.<br>
+      · 오늘 이미 본 영상만 맨 뒤로 가요. 채널 화면에서는 🔥 인기순 / 🆕 최신 / ⏮ 처음부터로 볼 수 있어요.</p>
     <div class="row"><button class="pbtn warn" id="histClear">시청 기록 지우기 (추천 초기화)</button></div>
 
     <h3>📝 로그 <span class="note" id="logCount"></span></h3>
@@ -209,7 +228,7 @@ const LOAD_TIMEOUT_MS = 25000;
 const LIST_CACHE_HOURS = 12;
 const TITLE_CONCURRENCY = 4;
 const CHANNEL_CONCURRENCY = 2;
-const LS = { channels:'kt_channels_v2', list:'kt_list_v2', titles:'kt_titles', bad:'kt_bad', log:'kt_log', hist:'kt_hist', tab:'kt_tab' };
+const LS = { channels:'kt_channels_v2', list:'kt_list_v2', titles:'kt_titles', bad:'kt_bad', log:'kt_log', hist:'kt_hist', tab:'kt_tab', favs:'kt_favs', pins:'kt_pins' };
 
 /* ---------- 저장소 (막혀 있어도 동작) ---------- */
 function storeFactory(){
@@ -245,7 +264,7 @@ const $ = id => document.getElementById(id);
 const el = {
   grid:$('grid'), chHeader:$('chHeader'), status:$('status'), more:$('more'), search:$('search'), tabs:$('tabs'),
   playerView:$('playerView'), shield:$('shield'), pausedMark:$('pausedMark'), endScreen:$('endScreen'), endCards:$('endCards'),
-  btnBack:$('btnBack'), btnPlay:$('btnPlay'), btnNext:$('btnNext'), endList:$('endList'),
+  btnBack:$('btnBack'), btnPlay:$('btnPlay'), btnNext:$('btnNext'), btnFav:$('btnFav'), pinList:$('pinList'), pinIn:$('pinIn'), pinName:$('pinName'), endList:$('endList'),
   nowTitle:$('nowTitle'), prog:document.querySelector('#prog i'),
   lockBtn:$('lockBtn'), parent:$('parent'), logBox:$('logBox'), logCount:$('logCount'), statBox:$('statBox'),
   chList:$('chList'), chId:$('chId'), chName:$('chName'), toast:$('toast'), loader:$('ytLoader')
@@ -292,7 +311,20 @@ let byId = new Map();
 let allowed = new Set();
 let view = [];              // 현재 화면 목록
 let shown = 0;
-let currentTab = store.get(LS.tab, 'rec'); if (currentTab !== 'chs') currentTab = 'rec';
+let currentTab = store.get(LS.tab, 'rec'); if (!['rec','chs','pin','fav'].includes(currentTab)) currentTab = 'rec';
+/* 즐겨찾기: [{id, added}] — 이 기기에 저장 / 지정 영상: [{id, title, author, added}] — 부모가 넣은 영상만 */
+let favs = store.get(LS.favs, []); if (!Array.isArray(favs)) favs = [];
+let pins = store.get(LS.pins, []); if (!Array.isArray(pins)) pins = [];
+const isFav = id => favs.some(f=>f.id===id);
+function toggleFav(id, from){
+  if (isFav(id)){ favs = favs.filter(f=>f.id!==id); toast('즐겨찾기에서 뺐어요'); log('INFO','즐겨찾기 해제', { id, from }); }
+  else { favs.unshift({ id, added: Date.now() }); toast('❤️ 즐겨찾기에 넣었어요!'); log('INFO','즐겨찾기 추가', { id, title: titles[id]||'', from }); }
+  store.set(LS.favs, favs);
+  document.querySelectorAll(`.card[data-id="${id}"] .fav`).forEach(n => n.textContent = isFav(id) ? '❤️' : '🤍');
+  updateFavBtn();
+  if (currentTab === 'fav' && !chPage && !el.playerView.classList.contains('on')) showView();
+}
+function updateFavBtn(){ if (current) el.btnFav.textContent = isFav(current.id) ? '❤️ 즐겨찾기됨' : '🤍 즐겨찾기'; }
 let chPage = null;          // 채널 안 화면 {id, sort, order}
 let recFeed = [];
 let ytReady = false, player = null, playerReady = false;
@@ -316,8 +348,13 @@ window.onYouTubeIframeAPIReady = function(){ ytReady = true; log('INFO', 'YouTub
   setTimeout(()=>{ if(!ytReady){ log('ERROR','YouTube API 15초 내 응답 없음'); showStatus('⚠️ 유튜브에 연결하지 못했어요. 새로고침 해 주세요.', true); } }, 15000);
 })();
 
-/* ---------- 채널 영상 목록 (업로드 재생목록 → getPlaylist, API 키 불필요) ---------- */
-function fetchChannelIds(ch){
+/* ---------- 채널 영상 목록 (API 키 없이 유튜브 자동 재생목록 사용) ----------
+   UULF+ID : 일반 영상만(쇼츠·라이브 제외, 최신순)
+   UULP+ID : 인기 영상(조회수 높은 순)
+   UUSH+ID : 쇼츠만 → 혹시 섞여 들어와도 빼기 위한 '제외 목록'
+   UU+ID   : 전체 업로드 (UULF가 안 될 때 비상용) */
+function fetchPlaylist(ch, prefix){
+  const listId = prefix + ch.id.slice(2);
   return new Promise((resolve, reject) => {
     const holder = document.createElement('div');
     const hid = 'ld_' + Math.random().toString(36).slice(2);
@@ -329,33 +366,46 @@ function fetchChannelIds(ch){
       const n = document.getElementById(hid); n && n.remove();
       err ? reject(err) : resolve(ids);
     };
-    const timer = setTimeout(()=>finish(new Error('시간 초과')), LOAD_TIMEOUT_MS);
+    const timer = setTimeout(()=>finish(new Error(prefix+' 시간 초과')), LOAD_TIMEOUT_MS);
     const poll = () => {
       if (done) return;
       let ids = null; try{ ids = p.getPlaylist(); }catch(e){}
       if (ids && ids.length){ finish(null, ids.slice()); return; }
-      if (++tries > 50){ finish(new Error('재생목록이 비어 있음 (채널 ID 확인)')); return; }
+      if (++tries > 40){ finish(new Error(prefix+' 재생목록이 비어 있음')); return; }
       setTimeout(poll, 400);
     };
     try{
       p = new YT.Player(hid, {
         width:200, height:120,
-        playerVars:{ listType:'playlist', list:uploadsId(ch.id), autoplay:0, mute:1, origin:location.origin },
-        events:{
-          onReady: () => poll(),
-          onError: e => { log('WARN', `[${ch.name}] 로더 오류 코드 ${e.data}`); poll(); }
-        }
+        playerVars:{ listType:'playlist', list:listId, autoplay:0, mute:1, origin:location.origin },
+        events:{ onReady: () => poll(), onError: e => { log('WARN', `[${ch.name}] ${prefix} 로더 오류 ${e.data}`); poll(); } }
       });
     }catch(e){ finish(e); }
   });
+}
+async function fetchChannelData(ch){
+  const [lf, lp, sh] = await Promise.allSettled([fetchPlaylist(ch,'UULF'), fetchPlaylist(ch,'UULP'), fetchPlaylist(ch,'UUSH')]);
+  const r = { v: 2, time: Date.now(), long: [], pop: [], shorts: [], fallbackUU: false };
+  r.shorts = sh.status === 'fulfilled' ? sh.value : [];
+  if (lf.status === 'fulfilled') r.long = lf.value;
+  else {
+    log('WARN', `[${ch.name}] 일반영상 목록(UULF) 실패 → 전체 업로드에서 쇼츠 빼고 사용`, String(lf.reason && lf.reason.message));
+    r.long = await fetchPlaylist(ch, 'UU');   // 이것도 실패하면 채널 전체 실패로 처리
+    r.fallbackUU = true;
+    if (!r.shorts.length) log('WARN', `[${ch.name}] 쇼츠 목록도 못 받아서 재생할 때 길이로 한 번 더 걸러요`);
+  }
+  if (lp.status === 'fulfilled') r.pop = lp.value;
+  else log('WARN', `[${ch.name}] 인기순 목록(UULP) 실패 → 최신순으로 대신 정렬`, String(lp.reason && lp.reason.message));
+  log('INFO', `[${ch.name}] 받음`, { 일반영상: r.long.length, 인기순: r.pop.length, 쇼츠제외: r.shorts.length, 비상모드: r.fallbackUU });
+  return r;
 }
 
 async function loadAll(force){
   if (!ytReady) return;
   showStatus('<span class="spin">⏳</span> 영상을 불러오는 중…');
   el.grid.innerHTML=''; el.more.style.display='none';
-  const need = channels.filter(c => c.on && (force || !listCache[c.id] || !listCache[c.id].ids || !listCache[c.id].ids.length
-                || Date.now() - listCache[c.id].time > LIST_CACHE_HOURS*3600e3));
+  const need = channels.filter(c => { const k = listCache[c.id];
+    return c.on && (force || !k || k.v !== 2 || !k.long || !k.long.length || Date.now() - k.time > LIST_CACHE_HOURS*3600e3); });
   log('INFO', '목록 불러오기', { 켜진채널: channels.filter(c=>c.on).length, 새로받기: need.length, force: !!force });
   const failed = [];
   let idx = 0;
@@ -363,10 +413,9 @@ async function loadAll(force){
     while (idx < need.length){
       const ch = need[idx++];
       try{
-        const ids = await fetchChannelIds(ch);
-        listCache[ch.id] = { time: Date.now(), ids };
-        log('INFO', `[${ch.name}] 영상 ${ids.length}개 받음`);
-        if (!ch.name || ch.name === ch.id) autoName(ch, ids[0]);
+        const d = await fetchChannelData(ch);
+        listCache[ch.id] = d;
+        if (!ch.name || ch.name === ch.id) autoName(ch, d.long[0]);
       }catch(e){
         failed.push(ch.name);
         log('ERROR', `[${ch.name}] 목록 불러오기 실패`, String(e && e.message || e));
@@ -375,7 +424,7 @@ async function loadAll(force){
   }
   await Promise.all(Array.from({length: CHANNEL_CONCURRENCY}, worker));
   store.set(LS.list, listCache);
-  if (failed.length) toast(`못 불러온 채널: ${failed.join(', ')} (이전 목록 사용)`);
+  if (failed.length) toast(`못 불러온 채널: ${failed.join(', ')}`);
   buildVideos();
 }
 
@@ -386,19 +435,37 @@ function buildVideos(){
     const i = layers.map(l=>l.name).lastIndexOf('channel'); if (i>=0) layers.splice(i,1);
     chPage = null;
   }
+  let removedShorts = 0;
   for (const ch of channels){
     if (!ch.on) continue;
-    const c = listCache[ch.id]; if (!c || !c.ids) continue;
-    const total = c.ids.length;
-    c.ids.forEach((id, rank) => {
+    const c = listCache[ch.id]; if (!c || c.v !== 2) continue;
+    const shorts = new Set(c.shorts || []);
+    const longs = (c.long || []).filter(id => !shorts.has(id));
+    const pops  = (c.pop  || []).filter(id => !shorts.has(id));
+    removedShorts += (c.long||[]).length - longs.length + (c.pop||[]).length - pops.length;
+    const lIdx = new Map(longs.map((id,i)=>[id,i])), pIdx = new Map(pops.map((id,i)=>[id,i]));
+    const ids = [...new Set([...longs, ...pops])];
+    ids.forEach(id => {
       if (badIds.has(id) || byId.has(id)) return;
-      const v = { id, ch: ch.id, rank, total };
+      const v = {
+        id, ch: ch.id,
+        rank: lIdx.has(id) ? lIdx.get(id) : longs.length + pIdx.get(id),    // 최신 순서 (인기목록에만 있으면 오래된 영상)
+        pop:  pIdx.has(id) ? pIdx.get(id) : pops.length + lIdx.get(id),     // 조회수 순서 (인기목록 없으면 최신순)
+        checkLen: !!c.fallbackUU && !pIdx.has(id)                           // 비상모드 영상은 재생 시 길이 확인
+      };
       videos.push(v); byId.set(id, v);
     });
   }
   allowed = new Set(videos.map(v=>v.id));
-  log('INFO', '사용할 영상 수', videos.length);
-  if (!videos.length){
+  // 지정 영상: 그 영상만 허용 (채널 영상 목록·추천에는 섞지 않음)
+  for (const pn of pins){
+    if (badIds.has(pn.id)) continue;
+    allowed.add(pn.id);
+    if (!byId.has(pn.id)) byId.set(pn.id, { id: pn.id, ch: null, rank: 0, pop: 0, pinned: true });
+    if (pn.title && !titles[pn.id]) titles[pn.id] = pn.title;
+  }
+  log('INFO', '사용할 영상 수', { 채널영상: videos.length, 지정영상: pins.length, 즐겨찾기: favs.length, 빠진쇼츠: removedShorts });
+  if (!videos.length && !pins.length){
     showStatus('⚠️ 보여줄 영상이 없어요.<br><small>부모 메뉴(🔒 3초)에서 채널과 로그를 확인해 주세요.</small>', true);
     renderTabs(); return;
   }
@@ -408,60 +475,38 @@ function buildVideos(){
   fetchTitles();
 }
 
-/* ---------- 추천 알고리즘 (허용 채널 안에서만) ---------- */
-function channelLove(){
-  // 채널별 '잘 본 정도' 0~1 : 끝까지 본 횟수·시청 시간 기반
-  const raw = {};
-  for (const [id, h] of Object.entries(hist)){
-    const v = byId.get(id); if (!v) continue;
-    raw[v.ch] = (raw[v.ch]||0) + (h.done||0)*2 + Math.min(h.sec||0, 1200)/300 - (h.skip||0)*0.5;
+/* ---------- 추천 = 허용 채널 각각의 '조회수 높은 순'을 채널끼리 번갈아 섞음 ----------
+   · 채널 비중: 한 바퀴에 조금 1개 / 보통 2개 / 많이 3개씩
+   · 오늘 이미 본 영상만 맨 뒤로 (계속 같은 영상이 맨 앞에 있지 않게) */
+function watchedToday(id){ const h = hist[id]; return !!(h && Date.now() - (h.last||0) < 864e5); }
+function buildRecommendations(){
+  const per = channels.filter(c=>c.on).map(c => ({
+    c, list: videos.filter(v=>v.ch===c.id && !watchedToday(v.id)).sort((a,b)=>a.pop-b.pop)
+  })).filter(x => x.list.length);
+  const feed = [];
+  let left = true;
+  while (left){
+    left = false;
+    for (const x of per){
+      for (let k=0; k<x.c.weight && x.list.length; k++) feed.push(x.list.shift());
+      if (x.list.length) left = true;
+    }
   }
-  const max = Math.max(1, ...Object.values(raw).map(x=>Math.max(0,x)));
-  const out = {}; for (const k in raw) out[k] = Math.max(0, raw[k]) / max;
+  const seen = videos.filter(v=>watchedToday(v.id)).sort((a,b)=>a.pop-b.pop);
+  const out = feed.concat(seen);
+  log('INFO', '추천 목록 생성(조회수순)', { 개수: out.length, 오늘본영상뒤로: seen.length, 앞5개: out.slice(0,5).map(v=>v.id) });
   return out;
-}
-function scoreOf(v, love, opts){
-  opts = opts || {};
-  const ch = chOf(v.ch); if (!ch || !ch.on) return -1e9;
-  const now = Date.now();
-  const recency = 1 - v.rank / Math.max(1, v.total);          // 최신일수록 1
-  let s = recency * 1.2 + Math.random() * 1.3;                   // 기본: 최신 + 랜덤(매번 달라지게)
-  s += (ch.weight - 2) * 0.7;                                    // 부모가 정한 비중
-  s += (love[v.ch] || 0) * 0.6;                                  // 은준이가 잘 보는 채널
-  const h = hist[v.id];
-  if (h){
-    const days = (now - (h.last||0)) / 864e5;
-    if (days < 1) s -= 3; else if (days < 3) s -= 1.5; else if (days < 14) s -= 0.6;
-    s -= Math.min(h.skip||0, 3) * 0.7;                           // 금방 꺼버린 영상
-    if (h.done && days >= 14) s += 0.3;                          // 예전에 끝까지 본 영상은 다시 볼 만함
-  }
-  if (opts.sameCh && v.ch === opts.sameCh) s += 0.8;             // 끝난 뒤 추천: 같은 채널 조금 우선
-  if (opts.exclude && opts.exclude.has(v.id)) s = -1e9;
-  return s;
-}
-function diversify(sorted, maxRun){
-  // 같은 채널이 maxRun개 넘게 연달아 나오지 않도록 재배열
-  const out = [], pool = sorted.slice();
-  while (pool.length){
-    const k = out.length;
-    const runCh = k >= maxRun && out.slice(k-maxRun).every(v=>v.ch===out[k-1].ch) ? out[k-1].ch : null;
-    let i = runCh ? pool.findIndex(v=>v.ch!==runCh) : 0;
-    if (i < 0) i = 0;
-    out.push(pool.splice(i,1)[0]);
-  }
-  return out;
-}
-function buildRecommendations(opts){
-  const love = channelLove();
-  const scored = videos.map(v => ({ v, s: scoreOf(v, love, opts) })).filter(x => x.s > -1e8);
-  scored.sort((a,b) => b.s - a.s);
-  const feed = diversify(scored.map(x=>x.v), 2);
-  log('INFO', '추천 목록 생성', { 개수: feed.length, 채널선호: love, 앞5개: feed.slice(0,5).map(v=>v.id) });
-  return feed;
 }
 function suggestNext(cur, n){
-  const ex = new Set([cur && cur.id]);
-  return buildRecommendations({ sameCh: cur && cur.ch, exclude: ex }).slice(0, n);
+  // 끝난 뒤: 같은 채널 인기 영상 1개 + 추천 순서대로, 방금/오늘 본 영상은 빼고
+  const feed = buildRecommendations().filter(v => !cur || v.id !== cur.id);
+  const fresh = feed.filter(v => !watchedToday(v.id));
+  const pool = fresh.length >= n ? fresh : feed;
+  const out = [];
+  const same = cur && pool.find(v => v.ch === cur.ch);
+  if (same) out.push(same);
+  for (const v of pool){ if (out.length >= n) break; if (!out.includes(v)) out.push(v); }
+  return out;
 }
 
 /* ---------- 화면 층 + 뒤로가기 버튼 ----------
@@ -495,7 +540,7 @@ function enterChannel(id, from){
   const ch = chOf(id); if (!ch || !ch.on) return;
   if (chPage && chPage.id === id) return;
   const wasOpen = !!chPage;
-  chPage = { id, sort: 'new', order: null };
+  chPage = { id, sort: 'pop', order: null };
   if (!wasOpen) pushLayer('channel');
   log('INFO', '채널 들어감', { name: ch.name, 경로: from || '' });
   showView(); window.scrollTo(0,0);
@@ -515,7 +560,7 @@ function renderChannelHeader(){
   back.addEventListener('click', () => { currentTab = 'chs'; store.set(LS.tab,'chs'); requestClose('channel'); });
   const nm = document.createElement('div'); nm.className='name'; nm.innerHTML = `${esc(ch?ch.name:'')}<small>영상 ${cnt}개</small>`;
   const sort = document.createElement('div'); sort.className='sort';
-  [['new','🆕 최신'],['old','⏮ 처음부터'],['mix','🔀 섞어서']].forEach(([k,lab]) => {
+  [['pop','🔥 인기순'],['new','🆕 최신'],['old','⏮ 처음부터']].forEach(([k,lab]) => {
     const b = document.createElement('button'); b.className = 'tab' + (chPage.sort===k?' on':''); b.textContent = lab;
     b.addEventListener('click', () => { chPage.sort = k; chPage.order = null; log('INFO','채널 정렬', lab); showView(); window.scrollTo(0,0); });
     sort.appendChild(b);
@@ -528,7 +573,7 @@ function renderChannelCards(){
   if (!onCh.length){ showStatus('채널이 없어요'); return; }
   hideStatus();
   onCh.forEach(c => {
-    const list = videos.filter(v=>v.ch===c.id).sort((a,b)=>a.rank-b.rank);
+    const list = videos.filter(v=>v.ch===c.id).sort((a,b)=>a.pop-b.pop);
     const b = document.createElement('button'); b.className='chcard';
     b.innerHTML = `<img class="th" alt="" src="https://i.ytimg.com/vi/${esc(list[0].id)}/mqdefault.jpg">
                    <div class="nm">${esc(c.name)}</div><div class="ct">영상 ${list.length}개 · 눌러서 들어가기</div>`;
@@ -552,13 +597,8 @@ function renderTabs(){
   };
   mk('rec', '⭐ 추천');
   mk('chs', '📺 채널');
-  const r = document.createElement('button'); r.id='refreshRec'; r.textContent='🔄 새 추천';
-  r.addEventListener('click', () => {
-    recFeed = buildRecommendations(); currentTab='rec'; store.set(LS.tab,'rec'); toast('새로운 추천이에요!');
-    if (chPage){ requestClose('channel'); return; }
-    renderTabs(); showView(); window.scrollTo(0,0);
-  });
-  el.tabs.appendChild(r);
+  if (pins.length) mk('pin', '📌 지정 영상');
+  mk('fav', `❤️ 즐겨찾기${favs.length ? ' ' + favs.filter(f=>allowed.has(f.id)).length : ''}`);
 }
 function showView(){
   const q = el.search.value.trim().toLowerCase();
@@ -569,18 +609,23 @@ function showView(){
     renderChannelHeader();
     let list = videos.filter(v=>v.ch===chPage.id);
     if (chPage.sort === 'old') list.sort((a,b)=>b.rank-a.rank);
-    else if (chPage.sort === 'mix'){ if (!chPage.order) chPage.order = shuffled(list).map(v=>v.id); const pos = new Map(chPage.order.map((id,i)=>[id,i])); list.sort((a,b)=>(pos.get(a.id)??1e9)-(pos.get(b.id)??1e9)); }
-    else list.sort((a,b)=>a.rank-b.rank);
+    else if (chPage.sort === 'new') list.sort((a,b)=>a.rank-b.rank);
+    else list.sort((a,b)=>a.pop-b.pop);
     view = q ? list.filter(byTitle) : list;
   } else if (q){
-    view = videos.filter(byTitle);
+    const seen = new Set();
+    view = [...videos, ...pins.map(p=>byId.get(p.id)).filter(Boolean)].filter(v => byTitle(v) && allowed.has(v.id) && !seen.has(v.id) && seen.add(v.id));
+  } else if (currentTab === 'pin'){
+    view = pins.map(p => byId.get(p.id)).filter(v => v && allowed.has(v.id));
+  } else if (currentTab === 'fav'){
+    view = favs.map(f => byId.get(f.id)).filter(v => v && allowed.has(v.id));
   } else if (currentTab === 'chs'){
     renderChannelCards(); return;
   } else {
     view = recFeed;
   }
   el.grid.innerHTML = ''; shown = 0;
-  if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : '영상이 없어요'); else hideStatus();
+  if (!view.length) showStatus(q ? '찾는 영상이 없어요 🙈' : currentTab === 'fav' && !chPage ? '아직 없어요!<br><small>다시 보고 싶은 영상의 🤍 를 누르면 여기 모여요</small>' : '영상이 없어요'); else hideStatus();
   renderMore();
 }
 function cardEl(v, onClick){
@@ -588,14 +633,17 @@ function cardEl(v, onClick){
   b.className = 'card'; b.dataset.id = v.id;
   const t = titles[v.id], ch = chOf(v.ch), h = hist[v.id];
   const seenToday = h && (Date.now() - h.last) < 864e5;
+  const pin = v.ch ? null : pins.find(p=>p.id===v.id);
   b.innerHTML = `<img class="th" loading="lazy" alt="" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg">
+     <span class="fav" role="button">${isFav(v.id) ? '❤️' : '🤍'}</span>
      ${seenToday ? '<span class="seen">봤어요 ✓</span>' : ''}
      <div class="tt ${t?'':'wait'}">${t?esc(t):'…'}</div>
-     <span class="cn">📺 ${esc(ch ? ch.name : '')}</span>`;
-  b.addEventListener('click', onClick || (() => play(v.id, chPage ? '채널 화면' : '목록')));
-  // 채널 이름을 누르면 그 채널로 들어감 (재생 화면·끝 화면에서는 재생만)
+     ${ch ? `<span class="cn">📺 ${esc(ch.name)}</span>` : `<span class="cn pin">📌 지정 영상</span>`}`;
+  b.addEventListener('click', onClick || (() => play(v.id, chPage ? '채널 화면' : (currentTab||'목록'))));
+  b.querySelector('.fav').addEventListener('click', e => { e.stopPropagation(); toggleFav(v.id, '카드'); });
+  // 채널 이름을 누르면 그 채널로 들어감 (지정 영상은 채널로 들어가지 않음)
   const cn = b.querySelector('.cn');
-  if (!onClick) cn.addEventListener('click', e => { e.stopPropagation(); enterChannel(v.ch, '채널 이름'); });
+  if (!onClick && ch) cn.addEventListener('click', e => { e.stopPropagation(); enterChannel(v.ch, '채널 이름'); });
   return b;
 }
 function renderMore(){
@@ -613,7 +661,7 @@ el.search.addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTime
 /* ---------- 제목 (oEmbed → 대체 서버) ---------- */
 let titleQueue = [], titleRunning = 0, titleSaveT = null, titleFails = 0;
 function fetchTitles(){
-  const order = [...recFeed.slice(0, 80), ...videos];
+  const order = [...pins.map(p=>({id:p.id})), ...favs.map(f=>({id:f.id})), ...recFeed.slice(0, 80), ...videos];
   const seen = new Set();
   titleQueue = order.map(v=>v.id).filter(id => !titles[id] && !seen.has(id) && seen.add(id));
   log('INFO', '제목 조회 대상', titleQueue.length);
@@ -680,6 +728,7 @@ function play(id, from){
   el.playerView.classList.add('on');
   el.endScreen.classList.remove('on');
   el.nowTitle.textContent = titles[id] || '';
+  updateFavBtn();
   log('INFO', '재생 시작', { id, title: titles[id] || '', 경로: from || '' });
   ensurePlayer(() => { try{ player.loadVideoById(id); }catch(e){ log('ERROR','loadVideoById 실패', String(e)); } });
   startProgress();
@@ -737,6 +786,7 @@ function onPlayerError(e){
     current = null;
     badIds.add(id); store.set(LS.bad, [...badIds]);
     allowed.delete(id); videos = videos.filter(v=>v.id!==id); recFeed = recFeed.filter(v=>v.id!==id);
+    if (pins.some(p=>p.id===id)) log('WARN','지정 영상이 재생 불가 → 부모 메뉴에 표시', id);
     document.querySelectorAll(`#grid [data-id="${id}"]`).forEach(n=>n.remove());
     toast('이 영상은 여기서 볼 수 없어요. 다른 영상으로!');
     setTimeout(next, 1200);
@@ -772,6 +822,17 @@ function startProgress(){
       if (current && player.getPlayerState() === YT.PlayerState.PLAYING) current.sec += Math.min(dt, 2);
       const d = player.getDuration(), c = player.getCurrentTime();
       if (d>0) el.prog.style.width = (c/d*100)+'%';
+      // 비상모드(전체 업로드)에서 온 영상만: 60초 이하면 쇼츠로 보고 건너뜀
+      const v = current && byId.get(current.id);
+      if (v && v.checkLen && d > 0 && !current.lenChecked){
+        current.lenChecked = true;
+        if (d <= 60){
+          log('WARN', '쇼츠로 보이는 짧은 영상 → 건너뜀', { id: v.id, 길이: d });
+          badIds.add(v.id); store.set(LS.bad, [...badIds]); allowed.delete(v.id);
+          videos = videos.filter(x=>x.id!==v.id); recFeed = recFeed.filter(x=>x.id!==v.id);
+          current = null; toast('짧은 영상은 건너뛰어요'); setTimeout(next, 300);
+        }
+      }
     }catch(e){}
   }, 500);
 }
@@ -781,6 +842,7 @@ el.shield.addEventListener('click', togglePlay);
 el.btnPlay.addEventListener('click', togglePlay);
 el.btnBack.addEventListener('click', closePlayer);
 el.btnNext.addEventListener('click', next);
+el.btnFav.addEventListener('click', () => { if (current) toggleFav(current.id, '재생 화면'); });
 el.endList.addEventListener('click', closePlayer);
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){
@@ -804,7 +866,7 @@ el.lockBtn.addEventListener('pointerdown', holdBegin);
 ['pointerup','pointerleave','pointercancel'].forEach(ev => el.lockBtn.addEventListener(ev, holdEnd));
 el.lockBtn.addEventListener('click', ()=>toast('어른이 3초 꾹 눌러요 🔒'));
 
-function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderStats(); renderLog(); pushLayer('parent'); el.parent.classList.add('on'); }
+function openParent(){ log('INFO','부모 메뉴 열림'); renderChannels(); renderPins(); renderStats(); renderLog(); pushLayer('parent'); el.parent.classList.add('on'); }
 let channelsChanged = false;
 function closeParent(){ requestClose('parent'); }
 function doCloseParent(){
@@ -827,6 +889,57 @@ function renderStats(){
   const chTxt = channels.map(c => `${esc(c.name)} ${perCh[c.id]||0}편`).join(' · ');
   el.statBox.innerHTML = `오늘 본 영상 <b>${n}편</b> · 약 <b>${Math.round(sec/60)}분</b><br><span class="note">끝까지 본 횟수(전체): ${chTxt || '-'}</span>`;
 }
+
+/* ---------- 지정 영상 관리 ---------- */
+function parseVideoIds(text){
+  const out = [];
+  const re = /(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/|\/v\/)([\w-]{11})(?![\w-])/g;
+  let m; while ((m = re.exec(text))) out.push(m[1]);
+  // 주소가 아니라 ID만 붙여 넣은 경우 (공백·줄바꿈으로 구분된 11자리)
+  String(text).split(/[\s,]+/).forEach(t => { if (/^[\w-]{11}$/.test(t)) out.push(t); });
+  return [...new Set(out)];
+}
+function renderPins(){
+  el.pinList.innerHTML = '';
+  if (!pins.length){ el.pinList.innerHTML = '<p class="note">아직 지정 영상이 없어요.</p>'; return; }
+  pins.forEach((pn, i) => {
+    const d = document.createElement('div'); d.className = 'pv';
+    const bad = badIds.has(pn.id);
+    d.innerHTML = `<img alt="" src="https://i.ytimg.com/vi/${esc(pn.id)}/default.jpg">
+      <div><b>${esc(pn.title || titles[pn.id] || pn.id)}</b><div class="note">${esc(pn.author||'')} · ${esc(pn.id)}${bad ? ' · <span style="color:#c0392b">⚠ 여기서 재생할 수 없는 영상</span>' : ''}</div></div>`;
+    const del = document.createElement('button'); del.className='pbtn warn'; del.textContent='삭제';
+    del.addEventListener('click', () => {
+      if (del.dataset.armed !== '1'){ del.dataset.armed='1'; del.textContent='한 번 더 누르면 삭제'; setTimeout(()=>{ del.dataset.armed=''; del.textContent='삭제'; }, 3000); return; }
+      pins.splice(i,1); store.set(LS.pins, pins); log('INFO','지정 영상 삭제', pn);
+      channelsChanged = true; renderPins();
+    });
+    d.appendChild(del); el.pinList.appendChild(d);
+  });
+}
+$('pinAdd').addEventListener('click', async () => {
+  const raw = el.pinIn.value.trim();
+  const ids = parseVideoIds(raw);
+  if (!ids.length){ toast('영상 주소/ID를 찾지 못했어요'); log('WARN','지정 영상 주소 인식 실패', raw); return; }
+  const name = el.pinName.value.trim();
+  const btn = $('pinAdd'); btn.disabled = true; btn.textContent = '확인 중…';
+  let added = 0;
+  try{
+    for (const id of ids){
+      if (pins.some(p=>p.id===id)) continue;
+      badIds.delete(id); store.set(LS.bad, [...badIds]);
+      const j = await getOembed(id);   // 영상이 실제로 있는지·제목 확인
+      if (!j) log('WARN','지정 영상 정보 확인 실패(그래도 추가)', id);
+      const pn = { id, title: (ids.length===1 && name) || (j && j.title) || '', author: (j && j.author_name) || '', added: Date.now() };
+      pins.push(pn); added++;
+      if (pn.title) titles[id] = pn.title;
+      log('INFO','지정 영상 추가', pn);
+    }
+  } finally { btn.disabled = false; btn.textContent = '영상 추가'; }
+  store.set(LS.pins, pins); store.set(LS.titles, titles);
+  el.pinIn.value=''; el.pinName.value='';
+  channelsChanged = true; renderPins();
+  toast(added ? `${added}개 추가했어요` : '이미 있는 영상이에요');
+});
 
 function renderChannels(){
   el.chList.innerHTML = '';
