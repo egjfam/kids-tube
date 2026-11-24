@@ -241,7 +241,6 @@ const DEFAULT_CHANNELS = [
   { id: 'UCoookXUzPciGrEZEXmh4Jjg', name: 'Sesame Street', on: true, weight: 2 },             // @SesameStreet
   { id: 'UCVcQH8A634mauPrGbWs7QlQ', name: 'Jack Hartmann', on: true, weight: 2 },             // @JackHartmann
   { id: 'UCRFIPG2u1DxKLNuE3y2SjHA', name: 'SciShow Kids', on: true, weight: 2 },              // @SciShowKids
-  { id: 'UCXVCgDuD_QCkI7gTKU7-tpg', name: 'Nat Geo Kids', on: true, weight: 2 },              // @natgeokids
   { id: 'UC5XMF3Inoi8R9nSI8ChOsdQ', name: 'Art For Kids Hub', on: true, weight: 2 },          // @artforkidshub
   { id: 'UC5uIZ2KOZZeQDQo_Gsi_qbQ', name: 'Cosmic Kids Yoga', on: true, weight: 2 },          // @CosmicKidsYoga
   { id: 'UCnBdzaRy-Ky9Vh54XJlFz1Q', name: 'Storyline Online', on: true, weight: 2 },          // @StorylineOnline
@@ -312,6 +311,18 @@ function loadChannels(){
 let channels = loadChannels();
 if (!channels.length) channels = DEFAULT_CHANNELS.map(x=>({...x}));
 // 새로 추가된 기본 채널은 한 번만 자동으로 넣어 줌 (부모가 삭제하면 다시 생기지 않음)
+// 퍼가기(다른 사이트 재생)를 막아 둔 채널 → 기존 설치에서도 한 번 자동으로 뺌
+const REMOVED_DEFAULTS = [ { id: 'UCXVCgDuD_QCkI7gTKU7-tpg', why: 'Nat Geo Kids: 유튜브 퍼가기 금지(오류 150)로 재생 불가' } ];
+(function removeBadDefaults(){
+  const done = new Set(store.get('kt_removed_done', []) || []);
+  REMOVED_DEFAULTS.forEach(r => {
+    if (done.has(r.id)) return;
+    const i = channels.findIndex(c => c.id === r.id);
+    if (i >= 0){ channels.splice(i, 1); log('INFO', '재생 불가 채널 자동 삭제', r); }
+    done.add(r.id);
+  });
+  store.set('kt_removed_done', [...done]);
+})();
 (function addNewDefaults(){
   const seen = new Set(store.get('kt_defaults_seen', []) || []);
   if (!seen.size) channels.forEach(c => seen.add(c.id));
@@ -384,7 +395,8 @@ window.onYouTubeIframeAPIReady = function(){ ytReady = true; log('INFO', 'YouTub
    UULP+ID : 인기 영상(조회수 높은 순)
    UUSH+ID : 쇼츠만 → 혹시 섞여 들어와도 빼기 위한 '제외 목록'
    UU+ID   : 전체 업로드 (UULF가 안 될 때 비상용) */
-function fetchPlaylist(ch, prefix){
+function fetchPlaylist(ch, prefix, maxTries){
+  maxTries = maxTries || 40;
   const listId = ch.listId || (prefix + ch.id.slice(2));   // ch.listId가 있으면 그 재생목록 그대로
   return new Promise((resolve, reject) => {
     const holder = document.createElement('div');
@@ -402,7 +414,7 @@ function fetchPlaylist(ch, prefix){
       if (done) return;
       let ids = null; try{ ids = p.getPlaylist(); }catch(e){}
       if (ids && ids.length){ finish(null, ids.slice()); return; }
-      if (++tries > 40){ finish(new Error(prefix+' 재생목록이 비어 있음')); return; }
+      if (++tries > maxTries){ finish(new Error(prefix+' 재생목록이 비어 있음')); return; }
       setTimeout(poll, 400);
     };
     try{
@@ -415,7 +427,7 @@ function fetchPlaylist(ch, prefix){
   });
 }
 async function fetchChannelData(ch){
-  const [lf, lp, sh] = await Promise.allSettled([fetchPlaylist(ch,'UULF'), fetchPlaylist(ch,'UULP'), fetchPlaylist(ch,'UUSH')]);
+  const [lf, lp, sh] = await Promise.allSettled([fetchPlaylist(ch,'UULF'), fetchPlaylist(ch,'UULP'), fetchPlaylist(ch,'UUSH', 8)]);   // 쇼츠 목록은 보조용이라 3초만 기다림 (UULF가 이미 쇼츠 제외)
   const r = { v: 2, time: Date.now(), long: [], pop: [], shorts: [], fallbackUU: false };
   r.shorts = sh.status === 'fulfilled' ? sh.value : [];
   if (lf.status === 'fulfilled') r.long = lf.value;
